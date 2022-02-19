@@ -1,0 +1,53 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "CMake Build All - Windows (Debug)",
+            "command": "cmake",
+            "args": [
+                "--build",
+                ".",
+                "--target",
+                "ALL_BUILD",
+                "--config",
+                "Debug"
+            ],
+            "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder}/build/"
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "CMake Build All - Windows (Release)",
+            "command": "cmake",
+            "args": [
+                "--build",
+                ".",
+                "--target",
+                "ALL_BUILD",
+                "--config",
+                "Release"
+            ],
+            "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder}/build/"
+            }
+        },
+        {
+            "label": "CMake Build All - Linux",
+            "command": "make",
+            "args": [
+                "-j4"
+            ],
+            "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder}/build_linux/"
+            }
+        }
+    ]
+}
