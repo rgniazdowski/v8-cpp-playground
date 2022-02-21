@@ -1,0 +1,57 @@
+#pragma once
+#ifndef FG_INC_PRE_CONFIGURATION_MAIN
+#define FG_INC_PRE_CONFIGURATION_MAIN
+
+#cmakedefine01 SDL2_FOUND
+#if (SDL2_FOUND)
+#define FG_USING_SDL2
+#endif
+
+#cmakedefine01 USING_BULLET
+#if (USING_BULLET)
+#define FG_USING_BULLET
+#endif
+
+#cmakedefine01 USING_TINYXML2
+#if (USING_TINYXML2)
+#define FG_USING_TINYXML2
+#endif
+
+#cmakedefine01 USING_VULKAN
+#if (USING_VULKAN)
+#define FG_USING_VULKAN
+#endif
+
+#cmakedefine01 USING_ASSIMP
+#if (USING_ASSIMP)
+#define FG_USING_ASSIMP
+#define FG_ASSIMP_IMPORTERS_ENABLED "@ASSIMP_IMPORTERS_ENABLED@"
+#define FG_ASSIMP_EXPORTERS_ENABLED "@ASSIMP_EXPORTERS_ENABLED@"
+#endif
+
+#cmakedefine01 USING_GLM
+#if (USING_GLM)
+#define FG_USING_GLM
+#endif
+
+#cmakedefine01 USING_STBFONT
+#if (USING_STBFONT)
+#define FG_USING_STBFONT
+#endif
+
+#cmakedefine01 USING_JSON
+#if (USING_JSON)
+#define FG_USING_JSON
+#endif
+
+#cmakedefine01 USING_LUA
+#if (USING_LUA)
+#define FG_USING_LUA
+#endif
+
+#cmakedefine01 USING_LOG4CPLUS
+#if (USING_LOG4CPLUS)
+#define FG_USING_LOG4CPLUS
+#endif
+
+#endif /* FG_INC_PRE_CONFIGURATION_MAIN */
