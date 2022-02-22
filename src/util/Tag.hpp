@@ -14,6 +14,45 @@ namespace util
     };
 
     template <typename UserClass>
+    struct UniversalId;
+
+    template <>
+    struct UniversalId<void>
+    {
+    private:
+        inline static std::unordered_map<uint32_t, std::string> registry = std::unordered_map<uint32_t, std::string>();
+
+    public:
+        static void set(uint32_t id, std::string_view key) { registry[id] = key; }
+        static bool has(uint32_t id) { return (registry.find(id) != registry.end()); }
+        static bool has(std::string_view key)
+        {
+            for (auto &it : registry)
+            {
+                if (it.second.compare(key) == 0)
+                    return true;
+            }
+            return false;
+        }
+        static std::string_view name(uint32_t id)
+        {
+            auto it = registry.find(id);
+            if (it == registry.end())
+                return std::string_view();
+            return it->second;
+        }
+        static uint32_t id(std::string_view key)
+        {
+            for (auto &it : registry)
+            {
+                if (it.second.compare(key) == 0)
+                    return it.first;
+            }
+            return 0;
+        }
+    };
+
+    template <typename UserClass>
     struct UniversalId : UniversalIdBase
     {
         using user_type = std::remove_pointer_t<UserClass>;
@@ -31,9 +70,19 @@ namespace util
             s_idset = true;
             return s_lid;
         }
-        static const char *name(void)
+
+        static const char *name(std::string_view setName = "")
         {
-            auto n = typeid(UserClass).name();
+            static std::string_view s_setName = "";
+            if (s_setName.empty() && !setName.empty())
+            {
+                s_setName = setName;
+                UniversalId<void>::set(self_type::id(), s_setName);
+                return s_setName.data();
+            } else if(!s_setName.empty()) {
+                return s_setName.data();
+            }
+            auto n = typeid(UserClass).name(); // fallback
             auto sv = std::string_view(n);
             int s = 0;
             for (int i = 0; i < sv.length(); i++)
@@ -46,6 +95,8 @@ namespace util
                 }
             }
             n += s;
+            if (!UniversalId<void>::has(self_type::id()))
+                UniversalId<void>::set(self_type::id(), n);
             return n;
         }
         UniversalId() = delete;
@@ -77,10 +128,12 @@ namespace util
             s_idset = true;
             return s_lid;
         }
-        static const char *name(void)
+        static const char *name(std::string_view setName = "")
         {
-            // static const char **needles;
-            auto n = typeid(UserClass).name();
+            static std::string_view s_setName = "";
+            if (s_setName.empty() && !setName.empty())
+                s_setName = setName;
+            auto n = s_setName.empty() ? typeid(UserClass).name() : s_setName.data();
             auto sv = std::string_view(n);
             int s = 0;
             for (int i = 0; i < sv.length(); i++)
