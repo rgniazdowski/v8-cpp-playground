@@ -35,7 +35,7 @@ namespace resource
                 if (info.callback)
                 {
                     info.callback((void *)this, (void *)info.userData);
-                    info.callback;
+                    info.callback.swap(callback_type());
                     info.userData = NULL;
                 }
             }
@@ -76,18 +76,19 @@ namespace resource
         CallbacksVec m_onDestructorCallbacks;
     }; //# class ManagedObject
 
-    template <typename TDataType, typename THandleType>
+    template <typename THandleType>
     class DataManagerBase;
 
-    template <typename THandleType, class TSuperClass>
+    template <typename THandleType>
     class ManagedObject : public ManagedObjectBase
     {
-        friend class DataManagerBase<TSuperClass, THandleType>;
-
     public:
         using handle_type = THandleType;
-        using tag_type = typename THandleType::tag_type;
-        using self_type = ManagedObject<THandleType, TSuperClass>;
+        using tag_type = typename handle_type::tag_type;
+        using data_type = typename tag_type::user_type;
+        using self_type = ManagedObject<handle_type>;
+
+        friend class DataManagerBase<handle_type>;
 
     protected:
         ManagedObject() : ManagedObjectBase(), m_handle() {}

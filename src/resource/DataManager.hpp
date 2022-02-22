@@ -11,20 +11,21 @@
 
 namespace resource
 {
-    template <typename TDataType, typename THandleType>
-    class DataManagerBase : public base::Manager<DataManagerBase<TDataType, THandleType>>,
-                            protected util::HandleManager<TDataType, THandleType>
+    template <typename THandleType>
+    class DataManagerBase : public base::Manager<DataManagerBase<THandleType>>,
+                            protected util::HandleManager<THandleType>
     {
-        static_assert(std::is_base_of<HandleBase, THandleType>::value, "THandleType template parameter type needs to be derived from HandleBase");
-        static_assert(std::is_base_of<ManagedObjectBase, TDataType>::value, "TDataType template parameter type needs to be derived from ManagedObjectBase");
-
     public:
-        using self_type = DataManagerBase<TDataType, THandleType>;
-        using manager_type = base::Manager<self_type>;
-        using handle_mgr_type = util::HandleManager<TDataType, THandleType>;
-        using tag_type = typename THandleType::tag_type;
         using handle_type = THandleType;
-        using data_type = std::remove_pointer_t<TDataType>;
+        using tag_type = typename handle_type::tag_type;
+        using data_type = typename tag_type::user_type;
+
+        using self_type = DataManagerBase<handle_type>;
+        using manager_type = base::Manager<self_type>;
+        using handle_mgr_type = util::HandleManager<handle_type>;
+
+        static_assert(std::is_base_of<util::HandleBase, handle_type>::value, "THandleType template parameter type needs to be derived from HandleBase");
+        static_assert(std::is_base_of<ManagedObjectBase, data_type>::value, "TDataType template parameter type needs to be derived from ManagedObjectBase");
 
     public:
         DataManagerBase() : manager_type(), handle_mgr_type() {}
@@ -68,8 +69,8 @@ namespace resource
     }; //# class DataManagerBase
 } //> namespace resource
 
-template <typename TDataType, typename THandleType>
-bool resource::DataManagerBase<TDataType, THandleType>::insert(data_type *pData, std::string_view nameTag)
+template <typename THandleType>
+bool resource::DataManagerBase<THandleType>::insert(data_type *pData, std::string_view nameTag)
 {
     if (!pData)
     {
@@ -113,20 +114,20 @@ bool resource::DataManagerBase<TDataType, THandleType>::insert(data_type *pData,
     return true;
 }
 
-template <typename TDataType, typename THandleType>
-bool resource::DataManagerBase<TDataType, THandleType>::rename(data_type *pData, std::string_view nameTag)
+template <typename THandleType>
+bool resource::DataManagerBase<THandleType>::rename(data_type *pData, std::string_view nameTag)
 {
     return true;
 }
 
-template <typename TDataType, typename THandleType>
-bool resource::DataManagerBase<TDataType, THandleType>::rename(const handle_type &dhUniqueID, std::string_view nameTag)
+template <typename THandleType>
+bool resource::DataManagerBase<THandleType>::rename(const handle_type &dhUniqueID, std::string_view nameTag)
 {
     return true;
 }
 
-template <typename TDataType, typename THandleType>
-bool resource::DataManagerBase<TDataType, THandleType>::remove(data_type *pData)
+template <typename THandleType>
+bool resource::DataManagerBase<THandleType>::remove(data_type *pData)
 {
     if (!self_type::isManaged(pData))
     {
@@ -135,8 +136,8 @@ bool resource::DataManagerBase<TDataType, THandleType>::remove(data_type *pData)
     return handle_mgr_type::releaseHandle(pData->getHandle());
 }
 
-template <typename TDataType, typename THandleType>
-bool resource::DataManagerBase<TDataType, THandleType>::remove(const handle_type &dhUniqueID)
+template <typename THandleType>
+bool resource::DataManagerBase<THandleType>::remove(const handle_type &dhUniqueID)
 {
     data_type *pData = self_type::get(dhUniqueID);
     if (!pData)
@@ -144,8 +145,8 @@ bool resource::DataManagerBase<TDataType, THandleType>::remove(const handle_type
     return handle_mgr_type::releaseHandle(pData->getHandle());
 }
 
-template <typename TDataType, typename THandleType>
-bool resource::DataManagerBase<TDataType, THandleType>::remove(std::string_view nameTag)
+template <typename THandleType>
+bool resource::DataManagerBase<THandleType>::remove(std::string_view nameTag)
 {
     data_type *pData = self_type::get(nameTag);
     if (!pData)
@@ -153,8 +154,8 @@ bool resource::DataManagerBase<TDataType, THandleType>::remove(std::string_view 
     return handle_mgr_type::releaseHandle(pData->getHandle());
 }
 
-template <typename TDataType, typename THandleType>
-bool resource::DataManagerBase<TDataType, THandleType>::destroyData(data_type *&pData)
+template <typename THandleType>
+bool resource::DataManagerBase<THandleType>::destroyData(data_type *&pData)
 {
     if (!remove(pData))
     {
@@ -166,8 +167,8 @@ bool resource::DataManagerBase<TDataType, THandleType>::destroyData(data_type *&
     return true;
 }
 
-template <typename TDataType, typename THandleType>
-bool resource::DataManagerBase<TDataType, THandleType>::destroyData(const handle_type &dhUniqueID)
+template <typename THandleType>
+bool resource::DataManagerBase<THandleType>::destroyData(const handle_type &dhUniqueID)
 {
     data_type *pData = handle_mgr_type::dereference(dhUniqueID);
     if (!remove(pData))
@@ -179,8 +180,8 @@ bool resource::DataManagerBase<TDataType, THandleType>::destroyData(const handle
     return true;
 }
 
-template <typename TDataType, typename THandleType>
-bool resource::DataManagerBase<TDataType, THandleType>::destroyData(std::string_view nameTag)
+template <typename THandleType>
+bool resource::DataManagerBase<THandleType>::destroyData(std::string_view nameTag)
 {
     data_type *pData = handle_mgr_type::dereference(nameTag);
     if (!remove(pData))
@@ -192,15 +193,15 @@ bool resource::DataManagerBase<TDataType, THandleType>::destroyData(std::string_
     return true;
 }
 
-template <typename TDataType, typename THandleType>
-typename resource::DataManagerBase<TDataType, THandleType>::data_type *resource::DataManagerBase<TDataType, THandleType>::get(const handle_type &dhUniqueID)
+template <typename THandleType>
+typename resource::DataManagerBase<THandleType>::data_type *resource::DataManagerBase<THandleType>::get(const handle_type &dhUniqueID)
 {
     data_type *pData = handle_mgr_type::dereference(dhUniqueID);
     return pData;
 }
 
-template <typename TDataType, typename THandleType>
-typename resource::DataManagerBase<TDataType, THandleType>::data_type *resource::DataManagerBase<TDataType, THandleType>::get(std::string_view nameTag)
+template <typename THandleType>
+typename resource::DataManagerBase<THandleType>::data_type *resource::DataManagerBase<THandleType>::get(std::string_view nameTag)
 {
     if (nameTag.empty())
     {
@@ -216,8 +217,8 @@ typename resource::DataManagerBase<TDataType, THandleType>::data_type *resource:
     return pData;
 }
 
-template <typename TDataType, typename THandleType>
-bool resource::DataManagerBase<TDataType, THandleType>::isManaged(data_type *pData)
+template <typename THandleType>
+bool resource::DataManagerBase<THandleType>::isManaged(data_type *pData)
 {
     if (!pData)
     {
@@ -237,15 +238,15 @@ bool resource::DataManagerBase<TDataType, THandleType>::isManaged(data_type *pDa
     return true;
 }
 
-template <typename TDataType, typename THandleType>
-bool resource::DataManagerBase<TDataType, THandleType>::isManaged(const handle_type &dhUniqueID)
+template <typename THandleType>
+bool resource::DataManagerBase<THandleType>::isManaged(const handle_type &dhUniqueID)
 {
     data_type *pData = self_type::get(dhUniqueID);
     return bool(pData != NULL);
 }
 
-template <typename TDataType, typename THandleType>
-bool resource::DataManagerBase<TDataType, THandleType>::isManaged(std::string_view nameTag)
+template <typename THandleType>
+bool resource::DataManagerBase<THandleType>::isManaged(std::string_view nameTag)
 {
     data_type *pData = self_type::get(nameTag);
     return bool(pData != NULL);

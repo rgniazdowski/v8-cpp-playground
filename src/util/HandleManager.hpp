@@ -9,16 +9,16 @@
 
 namespace util
 {
-    template <typename TDataType, typename THandleType>
+    template <typename THandleType>
     class HandleManager
     {
         static_assert(std::is_base_of<HandleBase, THandleType>::value, "THandleType template parameter type needs to be derived from HandleBase");
 
     public:
-        using tag_type = typename THandleType::tag_type;
         using handle_type = THandleType;
-        using self_type = HandleManager<TDataType, THandleType>;
-        using data_type = std::remove_pointer_t<TDataType>;
+        using tag_type = typename handle_type::tag_type;
+        using data_type = typename tag_type::user_type;
+        using self_type = HandleManager<handle_type>;
         using HashKeyString = std::string;
 
         /// Special Name map - maps std::string to the index
@@ -55,6 +55,7 @@ namespace util
 
         // Type for vector storing Data pointers
         using DataVec = Vector<DataHolder>;
+        using DataVecItor = typename DataVec::iterator;
 
     private:
         /// Free slots vector
@@ -103,8 +104,8 @@ namespace util
 } //> namespace util
 //#---------------------------------------------------------------------------------------
 
-template <typename TDataType, typename THandleType>
-void util::HandleManager<TDataType, THandleType>::clear(void)
+template <typename THandleType>
+void util::HandleManager<THandleType>::clear(void)
 {
     m_managedData.clear();
     m_freeSlots.clear();
@@ -113,8 +114,8 @@ void util::HandleManager<TDataType, THandleType>::clear(void)
 }
 //>---------------------------------------------------------------------------------------
 
-template <typename TDataType, typename THandleType>
-bool util::HandleManager<TDataType, THandleType>::acquireHandle(handle_type &rHandle, data_type *pResource)
+template <typename THandleType>
+bool util::HandleManager<THandleType>::acquireHandle(handle_type &rHandle, data_type *pResource)
 {
     // If free list is empty, add a new one otherwise use first one found
     uint32_t index;
@@ -144,8 +145,8 @@ bool util::HandleManager<TDataType, THandleType>::acquireHandle(handle_type &rHa
 }
 //>---------------------------------------------------------------------------------------
 
-template <typename TDataType, typename THandleType>
-bool util::HandleManager<TDataType, THandleType>::setupName(std::string_view name, const handle_type &rHandle)
+template <typename THandleType>
+bool util::HandleManager<THandleType>::setupName(std::string_view name, const handle_type &rHandle)
 {
     if (!isHandleValid(rHandle))
     {
@@ -209,8 +210,8 @@ bool util::HandleManager<TDataType, THandleType>::setupName(std::string_view nam
 }
 //>---------------------------------------------------------------------------------------
 
-template <typename TDataType, typename THandleType>
-bool util::HandleManager<TDataType, THandleType>::releaseHandle(const handle_type &rHandle)
+template <typename THandleType>
+bool util::HandleManager<THandleType>::releaseHandle(const handle_type &rHandle)
 {
     if (!isHandleValid(rHandle))
     {
@@ -241,15 +242,15 @@ bool util::HandleManager<TDataType, THandleType>::releaseHandle(const handle_typ
 }
 //>---------------------------------------------------------------------------------------
 
-template <typename TDataType, typename THandleType>
-void util::HandleManager<TDataType, THandleType>::releaseAllHandles(void)
+template <typename THandleType>
+void util::HandleManager<THandleType>::releaseAllHandles(void)
 {
     this->clear();
 }
 //>---------------------------------------------------------------------------------------
 
-template <typename TDataType, typename THandleType>
-typename util::HandleManager<TDataType, THandleType>::data_type *util::HandleManager<TDataType, THandleType>::dereference(const handle_type &handle)
+template <typename THandleType>
+typename util::HandleManager<THandleType>::data_type *util::HandleManager<THandleType>::dereference(const handle_type &handle)
 {
     if (!this->isHandleValid(handle))
         return nullptr;
@@ -259,8 +260,8 @@ typename util::HandleManager<TDataType, THandleType>::data_type *util::HandleMan
 }
 //>---------------------------------------------------------------------------------------
 
-template <typename TDataType, typename THandleType>
-typename util::HandleManager<TDataType, THandleType>::data_type *util::HandleManager<TDataType, THandleType>::dereference(std::string_view name)
+template <typename THandleType>
+typename util::HandleManager<THandleType>::data_type *util::HandleManager<THandleType>::dereference(std::string_view name)
 {
     if (name.empty())
         return nullptr;
@@ -285,8 +286,8 @@ typename util::HandleManager<TDataType, THandleType>::data_type *util::HandleMan
 }
 //>---------------------------------------------------------------------------------------
 
-template <typename TDataType, typename THandleType>
-typename util::HandleManager<TDataType, THandleType>::data_type *util::HandleManager<TDataType, THandleType>::dereference(NamedHandle &name)
+template <typename THandleType>
+typename util::HandleManager<THandleType>::data_type *util::HandleManager<THandleType>::dereference(NamedHandle &name)
 {
     if (name.empty())
         return nullptr;
@@ -322,8 +323,8 @@ typename util::HandleManager<TDataType, THandleType>::data_type *util::HandleMan
 }
 //>---------------------------------------------------------------------------------------
 
-template <typename TDataType, typename THandleType>
-bool util::HandleManager<TDataType, THandleType>::isDataManaged(data_type *pData)
+template <typename THandleType>
+bool util::HandleManager<THandleType>::isDataManaged(data_type *pData)
 {
     for (auto &item : m_managedData)
     {
@@ -334,8 +335,8 @@ bool util::HandleManager<TDataType, THandleType>::isDataManaged(data_type *pData
 }
 //>---------------------------------------------------------------------------------------
 
-template <typename TDataType, typename THandleType>
-bool util::HandleManager<TDataType, THandleType>::isHandleValid(const handle_type &handle)
+template <typename THandleType>
+bool util::HandleManager<THandleType>::isHandleValid(const handle_type &handle)
 {
     if (handle.isNull())
         return false;

@@ -145,7 +145,8 @@ namespace util
             }
             return false;
         }
-    };
+    }; //# class Vector
+    using StringVector = Vector<std::string>;
 } //> namespace util
 
 #endif //> FG_INC_VECTOR
