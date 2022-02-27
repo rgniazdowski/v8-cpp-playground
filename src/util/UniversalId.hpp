@@ -1,6 +1,6 @@
 #pragma once
-#ifndef FG_INC_UTIL_TAG
-#define FG_INC_UTIL_TAG
+#ifndef FG_INC_UTIL_UNIVERSAL_ID
+#define FG_INC_UTIL_UNIVERSAL_ID
 
 #include <typeinfo>
 #include <string>
@@ -8,17 +8,17 @@
 
 namespace util
 {
-    struct TagBase
+    struct UniversalIdBase
     {
     protected:
         inline static uint8_t s_gid = 0;
     };
 
     template <typename UserClass>
-    struct Tag;
+    struct UniversalId;
 
     template <>
-    struct Tag<void>
+    struct UniversalId<void>
     {
     private:
         inline static std::unordered_map<uint32_t, std::string> registry = std::unordered_map<uint32_t, std::string>();
@@ -51,14 +51,14 @@ namespace util
             }
             return 0;
         }
-    }; //# struct Tag<void>
+    }; //# struct UniversalId<void>
     //!-----------------------------------------------------------------------------------
 
     template <typename UserClass>
-    struct Tag : TagBase
+    struct UniversalId : UniversalIdBase
     {
         using user_type = std::remove_pointer_t<UserClass>;
-        using self_type = Tag<UserClass>;
+        using self_type = UniversalId<UserClass>;
 
     private:
         inline static bool s_idset = false;
@@ -79,7 +79,7 @@ namespace util
             if (s_setName.empty() && !setName.empty())
             {
                 s_setName = setName;
-                Tag<void>::set(self_type::id(), s_setName);
+                UniversalId<void>::set(self_type::id(), s_setName);
                 return s_setName.data();
             }
             else if (!s_setName.empty())
@@ -101,14 +101,14 @@ namespace util
             }
             n += s;
             // Register string name for a given id - id is static and incremented automatically
-            if (!Tag<void>::has(self_type::id()))
-                Tag<void>::set(self_type::id(), n);
+            if (!UniversalId<void>::has(self_type::id()))
+                UniversalId<void>::set(self_type::id(), n);
             return n;
         }
-        Tag() = delete;
-        Tag(const self_type &in) = delete;
+        UniversalId() = delete;
+        UniversalId(const self_type &in) = delete;
         self_type &operator=(const self_type &in) = delete;
-    }; //# struct Tag<UserClass>
+    }; //# struct UniversalId<UserClass>
 } //> namespace util
 
-#endif //> FG_INC_UTIL_TAG
+#endif //> FG_INC_UTIL_UNIVERSAL_ID
