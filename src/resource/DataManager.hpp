@@ -35,10 +35,7 @@ namespace resource
         }
 
     protected:
-        virtual void clear(void)
-        {
-            handle_mgr_type::releaseAllHandles();
-        }
+        virtual void clear(void) { handle_mgr_type::releaseAllHandles(); }
 
     public:
         virtual bool destroy(void) = 0;
@@ -51,21 +48,18 @@ namespace resource
 
         virtual bool remove(data_type *pData);
         virtual bool remove(const handle_type &dhUniqueID);
-        virtual bool remove(std::string_view nameTag);
+        virtual bool remove(const std::string &nameTag);
 
         virtual bool destroyData(data_type *&pData);
         virtual bool destroyData(const handle_type &dhUniqueID);
-        virtual bool destroyData(std::string_view nameTag);
+        virtual bool destroyData(const std::string &nameTag);
 
         virtual data_type *get(const handle_type &dhUniqueID);
-        virtual data_type *get(std::string_view nameTag);
-
-        virtual data_type *request(std::string_view info) = 0;
+        virtual data_type *get(const std::string &nameTag);
 
         virtual bool isManaged(data_type *pData);
         virtual bool isManaged(const handle_type &dhUniqueID);
-
-        virtual bool isManaged(std::string_view nameTag);
+        virtual bool isManaged(const std::string &nameTag);
     }; //# class DataManagerBase
 } //> namespace resource
 
@@ -101,7 +95,7 @@ bool resource::DataManagerBase<THandleType>::insert(data_type *pData, std::strin
     // This is important - on addition need to update the handle
     pData->setHandle(dhUniqueID);
     pData->setName(nameTag);
-    if (!handle_mgr_type::setupName(nameTag, dhUniqueID))
+    if (!handle_mgr_type::setupName(std::string(nameTag), dhUniqueID))
     {
         // Could not setup handle string tag/name for the resource
         // FG_MessageSubsystem->reportError(tag_type::name(), FG_ERRNO_RESOURCE_SETUP_HANDLE_NAME, FG_MSG_IN_FUNCTION);
@@ -146,7 +140,7 @@ bool resource::DataManagerBase<THandleType>::remove(const handle_type &dhUniqueI
 }
 
 template <typename THandleType>
-bool resource::DataManagerBase<THandleType>::remove(std::string_view nameTag)
+bool resource::DataManagerBase<THandleType>::remove(const std::string &nameTag)
 {
     data_type *pData = self_type::get(nameTag);
     if (!pData)
@@ -181,7 +175,7 @@ bool resource::DataManagerBase<THandleType>::destroyData(const handle_type &dhUn
 }
 
 template <typename THandleType>
-bool resource::DataManagerBase<THandleType>::destroyData(std::string_view nameTag)
+bool resource::DataManagerBase<THandleType>::destroyData(const std::string &nameTag)
 {
     data_type *pData = handle_mgr_type::dereference(nameTag);
     if (!remove(pData))
@@ -201,7 +195,7 @@ typename resource::DataManagerBase<THandleType>::data_type *resource::DataManage
 }
 
 template <typename THandleType>
-typename resource::DataManagerBase<THandleType>::data_type *resource::DataManagerBase<THandleType>::get(std::string_view nameTag)
+typename resource::DataManagerBase<THandleType>::data_type *resource::DataManagerBase<THandleType>::get(const std::string &nameTag)
 {
     if (nameTag.empty())
     {
@@ -225,7 +219,7 @@ bool resource::DataManagerBase<THandleType>::isManaged(data_type *pData)
         // FG_MessageSubsystem->reportWarning(tag_type::name(), FG_ERRNO_RESOURCE_PARAMETER_NULL, FG_MSG_IN_FUNCTION);
         return false;
     }
-    if (FG_IS_INVALID_HANDLE(pData->getHandle()) || !handle_mgr_type::isHandleValid(pData->getHandle()))
+    if (pData->getHandle().isNull() || !handle_mgr_type::isHandleValid(pData->getHandle()))
     {
         // FG_MessageSubsystem->reportError(tag_type::name(), FG_ERRNO_RESOURCE_HANDLE_INVALID, FG_MSG_IN_FUNCTION);
         return false;
@@ -246,7 +240,7 @@ bool resource::DataManagerBase<THandleType>::isManaged(const handle_type &dhUniq
 }
 
 template <typename THandleType>
-bool resource::DataManagerBase<THandleType>::isManaged(std::string_view nameTag)
+bool resource::DataManagerBase<THandleType>::isManaged(const std::string &nameTag)
 {
     data_type *pData = self_type::get(nameTag);
     return bool(pData != NULL);

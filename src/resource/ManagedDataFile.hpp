@@ -53,26 +53,14 @@ namespace resource
         inline FileMapping &getFileMapping(void) { return m_fileMapping; }
         inline unsigned int getFilesCount(void) const { return m_fileMapping.size(); }
 
-        inline std::string &getFilePath(void) { return m_filePath; }
         inline std::string const &getFilePath(void) const { return m_filePath; }
 
         inline std::string const &getFilePath(TMapKeyType id) const
         {
             FileMappingConstItor c_itor = m_fileMapping.find(id);
             if (c_itor == m_fileMapping.end())
-            {
                 return m_filePath;
-            }
             return c_itor->second;
-        }
-
-        inline std::string &getFilePath(TMapKeyType id)
-        {
-            if (m_fileMapping.find(id) == m_fileMapping.end())
-            {
-                return m_filePath;
-            }
-            return m_fileMapping[id];
         }
 
         inline void setDefaultID(TMapKeyType id) { m_defaultID = id; }
@@ -81,7 +69,7 @@ namespace resource
         FileMapping m_fileMapping;
         std::string m_filePath;
         TMapKeyType m_defaultID;
-    }; //# class ManagedDataFile
+    }; //# class ManagedDataFile<THandleType, TMapKeyType>
 
 } //> namespace resource
 

@@ -2,6 +2,7 @@
 #ifndef FG_INC_VECTOR
 #define FG_INC_VECTOR
 #include <vector>
+#include <string>
 
 namespace util
 {
@@ -21,10 +22,9 @@ namespace util
             this->reserve(this->size() + other.size());
             const unsigned int n = other.size();
             for (unsigned int i = 0; i < n; i++)
-            {
                 this->push_back(other.at(i));
-            }
         }
+
         self_type intersection(const base_type &other)
         {
             self_type result;
@@ -36,11 +36,7 @@ namespace util
             }
             return result;
         }
-        /**
-         *
-         * @param index
-         * @return
-         */
+
         bool remove(typename base_type::size_type index)
         {
             typename base_type::size_type n = this->size();
@@ -50,12 +46,7 @@ namespace util
             this->resize(n - 1);
             return true;
         }
-        /**
-         *
-         * @param index
-         * @param numElements
-         * @return
-         */
+
         bool remove(unsigned int &index, unsigned int &numElements)
         {
             typename base_type::size_type n = this->size();
@@ -67,6 +58,7 @@ namespace util
             numElements = n - 1;
             return true;
         }
+
         bool remove(unsigned int *index, unsigned int *numElements)
         {
             typename base_type::size_type n = this->size();
@@ -81,6 +73,7 @@ namespace util
                 *numElements = n - 1;
             return true;
         }
+
         int find(T const &value) const
         {
             int i = 0;
@@ -89,12 +82,11 @@ namespace util
                  it++, i++)
             {
                 if ((*it) == value)
-                {
                     return i;
-                }
             }
             return -1;
         }
+
         void reverse(void)
         {
             self_type rev = *this;
@@ -102,11 +94,10 @@ namespace util
             typename self_type::reverse_iterator b = rev.rbegin();
             typename self_type::reverse_iterator e = rev.rend();
             for (; b != e; b++)
-            {
                 this->push_back(*b);
-            }
             rev.clear();
         }
+
         typename base_type::const_iterator findItor(T const &value) const
         {
             for (typename base_type::const_iterator it = base_type::begin();
@@ -114,12 +105,11 @@ namespace util
                  it++)
             {
                 if ((*it) == value)
-                {
                     return it;
-                }
             }
             return base_type::end();
         }
+
         typename base_type::iterator findItor(T const &value)
         {
             for (typename base_type::iterator it = base_type::begin();
@@ -127,25 +117,23 @@ namespace util
                  it++)
             {
                 if ((*it) == value)
-                {
                     return it;
-                }
             }
             return base_type::end();
         }
+
         bool contains(T const &value) const
         {
             for (typename base_type::const_iterator it = base_type::begin();
                  it != base_type::end(); it++)
             {
                 if ((*it) == value)
-                {
                     return true;
-                }
             }
             return false;
         }
     }; //# class Vector
+
     using StringVector = Vector<std::string>;
 } //> namespace util
 

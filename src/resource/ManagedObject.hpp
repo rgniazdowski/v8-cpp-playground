@@ -106,13 +106,7 @@ namespace resource
         virtual ~ManagedObject() {}
 
     protected:
-        inline void setName(const char *name)
-        {
-            m_nameTag.set<tag_type>(name); // index should stay untouched
-            // m_handle = handle_type(m_nameTag.getIndex(), tag_type::id(), m_nameTag.getHash());
-        }
-
-        inline void setName(const std::string &name)
+        inline void setName(std::string_view name)
         {
             m_nameTag.set<tag_type>(name); // index should stay untouched
             // m_handle = handle_type(m_nameTag.getIndex(), tag_type::id(), m_nameTag.getHash());

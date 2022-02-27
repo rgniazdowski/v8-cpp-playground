@@ -3,7 +3,6 @@
 
 #include <string>
 #include <ctime>
-#include <cstring>
 
 #include <Quality.hpp>
 #include <Manager.hpp>
@@ -37,7 +36,7 @@ namespace resource
     };
 
     /// Enum type holding all possible resource types in the game engine
-    typedef unsigned int ResourceType;
+    using ResourceType = unsigned int;
 
     const ResourceType AUTO = 0x0000;
     const ResourceType INVALID = 0x0000;
@@ -109,7 +108,6 @@ namespace resource
         inline void setQuality(Quality quality) { m_quality = quality; }
         inline Quality getQuality(void) const { return m_quality; }
         inline ResourceType getResourceType(void) const { return m_resType; }
-        inline std::string &getCurrentFilePath(void) { return base_type::getFilePath(this->m_quality); }
         inline std::string const &getCurrentFilePath(void) const { return base_type::getFilePath(this->m_quality); }
 
     public:

@@ -4,6 +4,7 @@
 
 #include <typeinfo>
 #include <string>
+#include <unordered_map>
 
 namespace util
 {
@@ -50,7 +51,8 @@ namespace util
             }
             return 0;
         }
-    };
+    }; //# struct UniversalId<void>
+    //!-----------------------------------------------------------------------------------
 
     template <typename UserClass>
     struct UniversalId : UniversalIdBase
@@ -79,7 +81,9 @@ namespace util
                 s_setName = setName;
                 UniversalId<void>::set(self_type::id(), s_setName);
                 return s_setName.data();
-            } else if(!s_setName.empty()) {
+            }
+            else if (!s_setName.empty())
+            {
                 return s_setName.data();
             }
             auto n = typeid(UserClass).name(); // fallback
@@ -95,6 +99,7 @@ namespace util
                 }
             }
             n += s;
+            // Register string name for a given id - id is static and incremented automatically
             if (!UniversalId<void>::has(self_type::id()))
                 UniversalId<void>::set(self_type::id(), n);
             return n;
@@ -102,7 +107,8 @@ namespace util
         UniversalId() = delete;
         UniversalId(const self_type &in) = delete;
         self_type &operator=(const self_type &in) = delete;
-    };
+    }; //# struct UniversalId<UserClass>
+    //!-----------------------------------------------------------------------------------
 
     struct TagBase
     {
@@ -132,8 +138,16 @@ namespace util
         {
             static std::string_view s_setName = "";
             if (s_setName.empty() && !setName.empty())
+            {
                 s_setName = setName;
-            auto n = s_setName.empty() ? typeid(UserClass).name() : s_setName.data();
+                return s_setName.data();
+            }
+            else if (!s_setName.empty())
+            {
+                return s_setName.data();
+            }
+            // fallback to typeid and name, also try to jump over any spaces
+            auto n = typeid(UserClass).name();
             auto sv = std::string_view(n);
             int s = 0;
             for (int i = 0; i < sv.length(); i++)
@@ -151,7 +165,7 @@ namespace util
         Tag() = delete;
         Tag(const self_type &in) = delete;
         self_type &operator=(const self_type &in) = delete;
-    };
+    }; //# struct Tag<UserClass>
 } //> namespace util
 
 #endif //> FG_INC_UTIL_TAG

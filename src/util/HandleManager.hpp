@@ -80,18 +80,18 @@ namespace util
 
         bool acquireHandle(handle_type &rHandle, data_type *pResource);
 
-        bool setupName(std::string_view name, const handle_type &rHandle);
+        bool setupName(const std::string &name, const handle_type &rHandle);
 
         bool releaseHandle(const handle_type &handle);
         void releaseAllHandles(void);
 
         data_type *dereference(const handle_type &handle);
         data_type *dereference(NamedHandle &name);
-        data_type *dereference(std::string_view name);
+        data_type *dereference(const std::string &name);
 
         uint32_t getUsedHandleCount(void) const
         {
-            return (m_managedData.size() - m_freeSlots.size());
+            return (uint32_t)(m_managedData.size() - m_freeSlots.size());
         }
         bool hasUsedHandles(void) const { return (bool)(!!getUsedHandleCount()); }
         DataVec &getDataVector(void) { return m_managedData; }
@@ -146,7 +146,7 @@ bool util::HandleManager<THandleType>::acquireHandle(handle_type &rHandle, data_
 //>---------------------------------------------------------------------------------------
 
 template <typename THandleType>
-bool util::HandleManager<THandleType>::setupName(std::string_view name, const handle_type &rHandle)
+bool util::HandleManager<THandleType>::setupName(const std::string &name, const handle_type &rHandle)
 {
     if (!isHandleValid(rHandle))
     {
@@ -261,7 +261,7 @@ typename util::HandleManager<THandleType>::data_type *util::HandleManager<THandl
 //>---------------------------------------------------------------------------------------
 
 template <typename THandleType>
-typename util::HandleManager<THandleType>::data_type *util::HandleManager<THandleType>::dereference(std::string_view name)
+typename util::HandleManager<THandleType>::data_type *util::HandleManager<THandleType>::dereference(const std::string &name)
 {
     if (name.empty())
         return nullptr;
@@ -280,7 +280,7 @@ typename util::HandleManager<THandleType>::data_type *util::HandleManager<THandl
     if (index >= m_managedData.size())
         return nullptr;
     DataHolder &holder = m_managedData[index];
-    if (holder.nameTag.getHash() == name.getHash())
+    if (holder.nameTag.getHash() == nameTag.getHash())
         return holder.data;
     return nullptr;
 }
