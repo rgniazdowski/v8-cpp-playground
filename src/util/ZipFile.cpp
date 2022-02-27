@@ -7,7 +7,6 @@ util::ZipFile::ZipFile() : m_password(),
                            m_extractionPath(),
                            m_zipPath(),
                            m_filePaths(),
-                           m_fileItor(),
                            m_currentFileID(0),
                            m_zf(nullptr),
                            m_uf(nullptr),
@@ -24,7 +23,6 @@ util::ZipFile::ZipFile(std::string_view filePath) : m_password(),
                                                     m_extractionPath(),
                                                     m_zipPath(),
                                                     m_filePaths(),
-                                                    m_fileItor(),
                                                     m_currentFileID(0),
                                                     m_zf(nullptr),
                                                     m_uf(nullptr),
@@ -37,7 +35,19 @@ util::ZipFile::ZipFile(std::string_view filePath) : m_password(),
 }
 //>---------------------------------------------------------------------------------------
 
-util::ZipFile::ZipFile(const ZipFile &orig) {}
+util::ZipFile::ZipFile(const ZipFile &orig)
+{
+    this->m_filePath = orig.m_filePath;
+    this->m_currentFileID = orig.m_currentFileID;
+    this->m_extractionPath = orig.m_extractionPath;
+    this->m_filePaths = orig.m_filePaths;
+    this->m_zf = orig.m_zf;
+    this->m_uf = orig.m_uf;
+    this->m_zFilePos = orig.m_zFilePos;
+    this->m_zipPath = orig.m_zipPath;
+    this->m_zInfo = orig.m_zInfo;
+    this->m_zGlobalInfo = orig.m_zGlobalInfo;
+}
 //>---------------------------------------------------------------------------------------
 
 util::ZipFile::~ZipFile()

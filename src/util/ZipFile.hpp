@@ -61,8 +61,6 @@ namespace util
         std::string m_zipPath;
         /// List/vector with the file paths (relative) in the specified Zip
         StringVector m_filePaths;
-        /// Iterator to the element in the string vector (file paths)
-        StringVector::iterator m_fileItor;
         /// Number (ID) of the currently selected file (in Zip)
         int m_currentFileID;
 
@@ -114,7 +112,7 @@ namespace util
         std::string const &getCurrentFile(void) const { return m_selectedFilePath; }
         std::string const &getZipPath(void) const { return m_selectedFilePath; }
         FileMode getFileMode(void) const { return m_modeFlags; }
-        Mode getMode(void) const { return m_mode; }
+        Mode getZipMode(void) const { return m_mode; }
 
         StringVector const &getFileList(void) const { return m_filePaths; }
 

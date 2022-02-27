@@ -36,6 +36,7 @@ namespace util
     public:
         RegularFile();
         RegularFile(std::string_view filePath);
+        RegularFile(const RegularFile &orig) = delete;
 
         virtual ~RegularFile();
 

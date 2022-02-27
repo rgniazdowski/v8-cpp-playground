@@ -26,6 +26,7 @@ std::ios_base::openmode util::RegularFile::iosFileMode(Mode mode)
         openmode |= std::ios_base::trunc;
     return openmode;
 }
+//>---------------------------------------------------------------------------------------
 
 bool util::RegularFile::exists(std::string_view filePath)
 {
@@ -34,16 +35,15 @@ bool util::RegularFile::exists(std::string_view filePath)
 }
 //>---------------------------------------------------------------------------------------
 
-util::RegularFile::RegularFile()
+util::RegularFile::RegularFile() : base_type(), m_buffer(), m_ifs(), m_ofs()
 {
-    m_modeFlags = Mode::READ | Mode::BINARY;
+    m_modeFlags = Mode::READ | Mode::BINARY; // defualt
 }
 //>---------------------------------------------------------------------------------------
 
-util::RegularFile::RegularFile(std::string_view filePath)
+util::RegularFile::RegularFile(std::string_view filePath) : base_type(filePath), m_buffer(), m_ifs(), m_ofs()
 {
-    m_modeFlags = Mode::READ | Mode::BINARY;
-    m_filePath = filePath;
+    m_modeFlags = Mode::READ | Mode::BINARY; // default
 }
 //>---------------------------------------------------------------------------------------
 

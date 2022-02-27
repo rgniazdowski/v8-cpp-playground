@@ -44,25 +44,20 @@ namespace util
             }; // enum class Mode
 
         protected:
-            ///
             std::string m_filePath;
-            ///
             Mode m_modeFlags;
 
         public:
-            /**
-             *
-             */
             File() : m_filePath(), m_modeFlags(Mode::READ) {}
-            /**
-             *
-             */
+            File(std::string_view filePath) : m_filePath(filePath), m_modeFlags(Mode::READ) {}
             virtual ~File() {}
 
         public:
             virtual void setPath(std::string_view filePath) { m_filePath = filePath; }
             virtual const std::string &getPath(void) const { return m_filePath; }
             virtual void setMode(Mode mode) { m_modeFlags = mode; }
+            virtual Mode getMode(void) const { return m_modeFlags; }
+
             virtual bool isRead(void) const;
             virtual bool isWrite(void) const;
             virtual bool isUpdate(void) const;
