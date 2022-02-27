@@ -119,13 +119,13 @@ namespace util
         std::string strvalue;
 
     public:
+        const std::string &getTypeName(void) const noexcept { return tname; }
+
         constexpr bool isExternal(void) const noexcept { return type == EXTERNAL; }
 
         constexpr bool isString(void) const noexcept { return type == STRING; }
 
         constexpr bool isValid(void) const noexcept { return type != INVALID; }
-
-        constexpr const std::string &getTypeName(void) const noexcept { return tname; }
 
         constexpr Type getType(void) const noexcept { return type; }
 
@@ -174,7 +174,7 @@ namespace util
         }
 
         template <typename T>
-        constexpr const T &get(void) const
+        const T &get(void) const
         {
             const void *_data = &packed;
             const T *holder = static_cast<const T *>(_data);
@@ -182,10 +182,7 @@ namespace util
         }
 
         template <>
-        constexpr const std::string &get(void) const noexcept
-        {
-            return strvalue;
-        }
+        const std::string &get(void) const noexcept { return strvalue; }
 
     public:
         WrappedValue() : tname(), type(INVALID)
@@ -385,7 +382,7 @@ namespace util
         constexpr bool isProperty(void) const noexcept { return type == PROPERTY; }
         constexpr bool isVariable(void) const noexcept { return type == VARIABLE; }
         constexpr Type getType(void) const noexcept { return type; }
-        constexpr const std::string &getName(void) const noexcept { return name; }
+        const std::string &getName(void) const noexcept { return name; }
     }; //# class BindInfo
     //#-----------------------------------------------------------------------------------
 
@@ -396,7 +393,7 @@ namespace util
     class BindInfoMethodWrapped
     {
     public:
-        using WrappedFunction = std::function<WrappedValue *(void *pObj, const WrappedValue::Args &)>;
+        using WrappedFunction = std::function<WrappedValue *(void *, const WrappedValue::Args &)>;
         struct ParameterInfo
         {
             std::string name;
@@ -446,9 +443,9 @@ namespace util
                 return nullptr;
         }
 
-        constexpr const std::vector<ParameterInfo> &getParameters(void) const { return parameters; }
+        const std::vector<ParameterInfo> &getParameters(void) const { return parameters; }
 
-        constexpr const std::string &getReturnType(void) const { return returnType; }
+        const std::string &getReturnType(void) const { return returnType; }
     }; //# BindInfoMethodWrapped
     //#-----------------------------------------------------------------------------------
 
@@ -551,10 +548,7 @@ namespace util
                 setterWrapped(static_cast<void *>(pObj), args);
         }
 
-        constexpr const std::string &getValueType(void) const noexcept
-        {
-            return valueType;
-        }
+        const std::string &getValueType(void) const noexcept { return valueType; }
     }; //# BindInfoPropertyWrapped
     //#---------------------------------------------------------------------------------------
 
@@ -659,7 +653,7 @@ namespace util
         template <bool is_pointer = std::is_pointer<VarType>::value>
         typename std::enable_if<is_pointer == true>::type wrap(BindInfoVariable *pThis)
         {
-            this->getterWrapped = [pThis](void *pObj) constexpr
+            this->getterWrapped = [pThis](void *pObj)
             {
                 auto value = pThis->get(static_cast<UserClass *>(pObj));
                 return WrappedValue::external(&value, value->getIdentifier());
@@ -674,7 +668,7 @@ namespace util
         template <bool is_pointer = std::is_pointer<VarType>::value>
         typename std::enable_if<is_pointer == false>::type wrap(BindInfoVariable *pThis)
         {
-            this->getterWrapped = [pThis](void *pObj) constexpr
+            this->getterWrapped = [pThis](void *pObj)
             {
                 auto value = pThis->get(static_cast<UserClass *>(pObj));
                 return WrappedValue::wrap(value); // ptr
@@ -796,9 +790,9 @@ namespace util
     public:
         MetadataBindings(const std::string &_typeName) : typeName(_typeName), bindings() {}
 
-        constexpr const std::string &getTypeName(void) const noexcept { return typeName; }
+        const std::string &getTypeName(void) const noexcept { return typeName; }
 
-        constexpr const BindInfo::Bindings &getBindings(void) const noexcept { return bindings; }
+        const BindInfo::Bindings &getBindings(void) const noexcept { return bindings; }
 
         template <class UserClass, typename ReturnType, typename... Args>
         self_type &method(const std::string &methodName, ReturnType (UserClass::*methodMember)(Args...), const std::initializer_list<std::string> &argNames = {})

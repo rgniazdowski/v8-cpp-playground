@@ -60,7 +60,6 @@ bool util::Dirent::internal_readZipFile(const std::string &fileName, const std::
 bool util::Dirent::readDir(bool recursive, bool listZipFiles)
 {
     m_filePaths.clear();
-
     FileNamesVector dirStack;
     FileNamesVector dirPaths;
     DirEntriesVector dirEntries;
