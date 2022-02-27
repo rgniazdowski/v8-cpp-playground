@@ -34,12 +34,14 @@ set(FG_USING_LOG4CPLUS_MSG "Use log4cplus C++ logging API with this build")
 set(FG_USING_V8PP_MSG "Use v8pp to bind C++ functions and classes into V8 JavaScript engine")
 set(FG_USING_CPPBTREE_MSG "Use C++ B-tree custom headers for STL containers replacement")
 set(FG_USING_ZEROMQ_MSG "Use ZeroMQ")
+set(FG_USING_MINIZIP_NG_MSG "Use MiniZip NG")
 
 option(USING_JSON ${FG_USING_JSON_MSG} ON)
 option(USING_LOG4CPLUS ${FG_USING_LOG4CPLUS_MSG} OFF)
 option(USING_V8PP ${FG_USING_V8PP_MSG} ON)
 option(USING_CPPBTREE ${FG_USING_CPPBTREE_MSG} OFF)
 option(USING_ZEROMQ ${FG_USING_ZEROMQ_MSG} ON)
+option(USING_MINIZIP_NG ${FG_USING_MINIZIP_NG_MSG} ON)
 
 find_package(V8 CONFIG REQUIRED)
 set(V8_INCLUDE_DIRS ${V8_INCLUDE_DIR}) # for possible compatibility with different packages
@@ -53,6 +55,27 @@ CPMAddPackage(
 if (magic_enum_ADDED)
     set(FG_ALL_INCLUDE_DIRS ${FG_ALL_INCLUDE_DIRS} ${magic_enum_SOURCE_DIR}/include)
 endif()
+
+#
+# 
+if(USING_MINIZIP_NG)
+    message(STATUS "Project will use minizip-ng/zlib-ng for compression support")
+    CPMAddPackage(
+        NAME minizip
+        GITHUB_REPOSITORY zlib-ng/minizip-ng
+        GIT_TAG 3.0.4
+        OPTIONS
+        "MZ_COMPAT ON"
+        "MZ_BUILD_TESTS OFF"
+        "MZ_CODE_COVERAGE OFF"
+        "MZ_LZMA OFF"
+        "MZ_ZSTD OFF"
+    )
+    if(minizip_ADDED)
+        set(FG_ALL_INCLUDE_DIRS ${FG_ALL_INCLUDE_DIRS} ${minizip_SOURCE_DIR})
+        set(FG_ALL_LIBRARIES ${FG_ALL_LIBRARIES} minizip)
+    endif()
+endif() #USING_MINIZIP_NG
 
 #
 # ZeroMQ & separate C++ bindings
