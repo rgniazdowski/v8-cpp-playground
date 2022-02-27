@@ -15,6 +15,11 @@ enum class Quality : char
     REALITY = 5
 };
 
+inline bool isQualityTextValid(std::string_view text)
+{
+    return magic_enum::enum_cast<Quality>(text).has_value();
+}
+
 inline Quality getQualityFromText(std::string_view text)
 {
     auto quality = magic_enum::enum_cast<Quality>(text);
