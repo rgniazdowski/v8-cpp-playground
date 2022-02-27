@@ -18,7 +18,7 @@ enum class Quality : char
 inline Quality getQualityFromText(std::string_view text)
 {
     auto quality = magic_enum::enum_cast<Quality>(text);
-    return (quality.has_value() ? quality.value() : Quality::UNIVERSAL;
+    return (quality.has_value() ? quality.value() : Quality::UNIVERSAL);
 }
 
 inline std::string_view getQualityName(Quality quality)

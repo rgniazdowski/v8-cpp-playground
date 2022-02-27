@@ -114,10 +114,10 @@ namespace util
         // Overload standard bitwise operator for enum type
         ENUM_FLAGS(File::Mode);
 
-        bool File::isRead(void) const { return (bool)(m_modeFlags & Mode::READ); }
-        bool File::isWrite(void) const { return (bool)(m_modeFlags & Mode::WRITE); }
-        bool File::isUpdate(void) const { return (bool)(m_modeFlags & Mode::UPDATE); }
-        bool File::isAppend(void) const { return (bool)(m_modeFlags & Mode::APPEND); }
+        inline bool File::isRead(void) const { return (bool)(m_modeFlags & Mode::READ); }
+        inline bool File::isWrite(void) const { return (bool)(m_modeFlags & Mode::WRITE); }
+        inline bool File::isUpdate(void) const { return (bool)(m_modeFlags & Mode::UPDATE); }
+        inline bool File::isAppend(void) const { return (bool)(m_modeFlags & Mode::APPEND); }
     } //> namespace base
 } //> namespace util
 

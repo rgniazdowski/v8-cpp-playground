@@ -9,7 +9,10 @@
 
 namespace util
 {
-    struct path_string
+    using DirEntriesVector = std::vector<std::filesystem::directory_entry>;
+    using FileNamesVector = std::vector<std::string>;
+
+    struct entry_to_path
     {
         std::string operator()(const std::filesystem::directory_entry &entry) const
         {
@@ -17,13 +20,11 @@ namespace util
         }
     };
 
-    void read_directory(std::string_view name, std::vector<std::string> &vec)
-    {
-        std::filesystem::path path(name);
-        std::filesystem::directory_iterator start(path);
-        std::filesystem::directory_iterator end;
-        std::transform(start, end, std::back_inserter(vec), path_string());
-    }
+    void transform_entries_to_paths(const DirEntriesVector &input, FileNamesVector &vec);
+
+    void read_directory(std::string_view name, FileNamesVector &vec);
+
+    void read_directory(std::string_view name, DirEntriesVector &vec);
 } //> namespace util
 
 namespace strings

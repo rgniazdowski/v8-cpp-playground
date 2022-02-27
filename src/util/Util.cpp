@@ -3,6 +3,31 @@
 
 #include <sstream>
 
+void util::transform_entries_to_paths(const DirEntriesVector &input, FileNamesVector &vec)
+{
+    std::transform(input.begin(), input.end(), std::back_inserter(vec), entry_to_path());
+}
+//>---------------------------------------------------------------------------------------
+
+void util::read_directory(std::string_view name, FileNamesVector &vec)
+{
+    std::filesystem::path path(name);
+    std::filesystem::directory_iterator start(path);
+    std::filesystem::directory_iterator end;
+    std::transform(start, end, std::back_inserter(vec), entry_to_path());
+}
+//>---------------------------------------------------------------------------------------
+
+void util::read_directory(std::string_view name, DirEntriesVector &vec)
+{
+    std::filesystem::path path(name);
+    std::filesystem::directory_iterator start(path);
+    std::filesystem::directory_iterator end;
+    for (; start != end; start++)
+        vec.push_back(*start);
+}
+//>---------------------------------------------------------------------------------------
+
 void strings::toLower(std::string &output, const std::string &input)
 {
     if (input.empty())
