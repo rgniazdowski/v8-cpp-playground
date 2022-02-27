@@ -13,25 +13,30 @@ namespace util
         using self_type = FactoryObjectBase;
 
     public:
-        FactoryObjectBase() {}
+        std::string fileExtension;
+
+    public:
+        FactoryObjectBase() : fileExtension() {}
+        FactoryObjectBase(std::string_view fileExt) : fileExtension(fileExt) {}
         virtual ~FactoryObjectBase() {}
 
         virtual void *create(void) = 0;
         virtual void *recreate(void *pSource) = 0;
-    };
+    }; //# class FactoryObjectBase
+    //#-----------------------------------------------------------------------------------
 
     template <typename TClassType>
     class FactoryObject : public FactoryObjectBase
     {
     public:
         using return_type = TClassType;
-        typedef FactoryObjectBase base_type;
-        typedef FactoryObject<TClassType> self_type;
-        typedef FactoryObject<TClassType> type;
+        using base_type = FactoryObjectBase;
+        using self_type = FactoryObject<TClassType>;
 
     public:
         FactoryObject() : base_type() {}
-        FactoryObject(const self_type &orig) {}
+        FactoryObject(std::string_view fileExt) : base_type(fileExt) {}
+        FactoryObject(const self_type &orig) { fileExtension = orig.fileExtension; }
 
         virtual ~FactoryObject() {}
 
@@ -43,15 +48,12 @@ namespace util
         virtual void *recreate(void *pSource)
         {
             if (!pSource)
-            {
                 return create();
-            }
             else
-            {
                 return (void *)new TClassType(*(static_cast<TClassType *>(pSource)));
-            }
         }
-    };
+    }; //# class FactoryObject<TClassType>
+    //#-----------------------------------------------------------------------------------
 
     template <typename TKeyType, typename TClassType>
     class AbstractFactory
@@ -83,15 +85,26 @@ namespace util
         }
 
         template <typename TClassType>
-        bool registerObjectType(const key_type &key, std::string_view keyName)
+        bool registerObjectType(const key_type &key, std::string_view keyName, std::string_view fileExt = "")
         {
             using UserClass = std::remove_pointer_t<TClassType>;
+            using TagType = typename UserClass::tag_type;
+            TagType::id();          // ensure to bump up the unique id (automatic)
+            TagType::name(keyName); // try to trigger first use of input name
             auto it = m_factoryMap.find(key);
             if (it != m_factoryMap.end())
                 return false;
-            m_factoryMap[key] = new FactoryObject<UserClass>();
+            m_factoryMap[key] = new FactoryObject<UserClass>(fileExt);
             m_nameMap[keyName] = key;
             return true;
+        }
+
+        template <typename TClassType>
+        bool registerObjectType(std::string_view fileExt = "")
+        {
+            using UserClass = std::remove_pointer_t<TClassType>;
+            using TagType = typename UserClass::tag_type;
+            return registerObjectType<UserClass>(TagType::id(), TagType::name(), fileExt);
         }
 
         bool unregisterObjectType(const key_type &key)
@@ -200,21 +213,22 @@ namespace util
         return_type *recreate(const key_type &key, return_type *pSource)
         {
             return_type *pObject = nullptr;
-            create(key, &pObject, pSource);
+            recreate(key, &pObject, pSource);
             return pObject;
         }
 
         return_type *recreate(std::string_view keyName, return_type *pSource)
         {
             return_type *pObject = nullptr;
-            create(keyName, &pObject, pSource);
+            recreate(keyName, &pObject, pSource);
             return pObject;
         }
 
     private:
         FactoryMap m_factoryMap;
         NameMap m_nameMap;
-    }; //# class AbstractFactory
+    }; //# class AbstractFactory<TKeyType, TClassType>
+    //#-----------------------------------------------------------------------------------
 
 } //> namespace util
 
