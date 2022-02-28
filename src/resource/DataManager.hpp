@@ -29,13 +29,7 @@ namespace resource
 
     public:
         DataManagerBase() : manager_type(), handle_mgr_type() {}
-        virtual ~DataManagerBase()
-        {
-            clear();
-        }
-
-    protected:
-        virtual void clear(void) { handle_mgr_type::releaseAllHandles(); }
+        virtual ~DataManagerBase() {}
 
     public:
         virtual bool destroy(void) = 0;

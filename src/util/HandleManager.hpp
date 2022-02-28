@@ -70,13 +70,10 @@ namespace util
         /// Map for binding hash sum to index
         HashMap m_hashMap;
 
-    protected:
-        void clear(void);
-
     public:
         HandleManager() : m_freeSlots(), m_managedData(), m_nameMap(), m_hashMap() {}
 
-        virtual ~HandleManager() { clear(); }
+        virtual ~HandleManager() { releaseAllHandles(); }
 
         bool acquireHandle(handle_type &rHandle, data_type *pResource);
 
@@ -103,16 +100,6 @@ namespace util
 
 } //> namespace util
 //#---------------------------------------------------------------------------------------
-
-template <typename THandleType>
-void util::HandleManager<THandleType>::clear(void)
-{
-    m_managedData.clear();
-    m_freeSlots.clear();
-    m_nameMap.clear();
-    m_hashMap.clear();
-}
-//>---------------------------------------------------------------------------------------
 
 template <typename THandleType>
 bool util::HandleManager<THandleType>::acquireHandle(handle_type &rHandle, data_type *pResource)
@@ -237,7 +224,7 @@ bool util::HandleManager<THandleType>::releaseHandle(const handle_type &rHandle)
     holder.clear();
     m_freeSlots.push_back(index);
     if (!this->getUsedHandleCount())
-        this->clear(); // no handle used - reset all to start from scratch
+        this->releaseAllHandles(); // no handle used - reset all to start from scratch
     return true;
 }
 //>---------------------------------------------------------------------------------------
@@ -245,7 +232,10 @@ bool util::HandleManager<THandleType>::releaseHandle(const handle_type &rHandle)
 template <typename THandleType>
 void util::HandleManager<THandleType>::releaseAllHandles(void)
 {
-    this->clear();
+    m_managedData.clear();
+    m_freeSlots.clear();
+    m_nameMap.clear();
+    m_hashMap.clear();
 }
 //>---------------------------------------------------------------------------------------
 

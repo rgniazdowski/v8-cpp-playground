@@ -8,7 +8,6 @@ namespace base
     {
     protected:
         inline static uint8_t s_gid = 0;
-        virtual void clear(void) = 0;
 
     public:
         virtual bool destroy(void) = 0;

@@ -10,9 +10,10 @@ namespace util
     class Vector : public std::vector<T, Alloc>
     {
     public:
-        typedef Vector<T, Alloc> self_type;
-        typedef std::vector<T, Alloc> base_type;
-        typedef typename base_type::size_type size_type;
+        using self_type = Vector<T, Alloc>;
+        using base_type = std::vector<T, Alloc>;
+        using size_type = typename base_type::size_type;
+        using base_type::vector;
 
     public:
         void append(const base_type &other)
