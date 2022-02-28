@@ -24,19 +24,19 @@ namespace util
                                   bool recursive = false);
 
     public:
-        bool readDir(bool recursive = false, bool listZipFiles = false);
-
-        bool readDir(std::string_view dirPath, bool recursive = false, bool listZipFiles = false);
+        bool read(bool recursive = false, bool listZipFiles = false);
+        bool read(std::string_view dirPath, bool recursive = false, bool listZipFiles = false);
 
         const char *getNextFile(void);
+        std::string &getNextFile(std::string &path);
+        bool rewind(void);
 
-        std::string &getNextFilePath(std::string &path);
         std::string &searchForFile(std::string &output, const std::string &basePath,
                                    const std::string &pattern, const bool deep = false);
 
         const std::vector<std::string> &getFiles(void) const { return m_filePaths; }
-        bool rewind(void);
-        void clearList(void);
+
+        void clear(void);
 
     protected:
         std::string m_dirPath;

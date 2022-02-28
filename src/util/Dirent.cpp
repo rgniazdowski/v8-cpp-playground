@@ -13,7 +13,7 @@ util::Dirent::Dirent() : m_dirPath(),
 util::Dirent::Dirent(std::string_view dirPath)
 {
     m_isRecursive = false;
-    readDir(dirPath, false);
+    read(dirPath, false);
 }
 
 util::Dirent::~Dirent()
@@ -57,7 +57,7 @@ bool util::Dirent::internal_readZipFile(const std::string &fileName, const std::
 }
 //>---------------------------------------------------------------------------------------
 
-bool util::Dirent::readDir(bool recursive, bool listZipFiles)
+bool util::Dirent::read(bool recursive, bool listZipFiles)
 {
     m_filePaths.clear();
     FileNamesVector dirStack;
@@ -116,13 +116,13 @@ bool util::Dirent::readDir(bool recursive, bool listZipFiles)
 }
 //>---------------------------------------------------------------------------------------
 
-bool util::Dirent::readDir(std::string_view dirPath, bool recursive, bool listZipFiles)
+bool util::Dirent::read(std::string_view dirPath, bool recursive, bool listZipFiles)
 {
     if (dirPath.empty())
         m_dirPath = path::getAssetsPath();
     else
         m_dirPath = dirPath;
-    return readDir(recursive, listZipFiles);
+    return read(recursive, listZipFiles);
 }
 //>---------------------------------------------------------------------------------------
 
@@ -143,7 +143,7 @@ const char *util::Dirent::getNextFile(void)
 }
 //>---------------------------------------------------------------------------------------
 
-std::string &util::Dirent::getNextFilePath(std::string &path)
+std::string &util::Dirent::getNextFile(std::string &path)
 {
     const char *filename = util::Dirent::getNextFile();
     path.clear();
@@ -209,7 +209,7 @@ std::string &util::Dirent::searchForFile(std::string &output,
     strings::split(patterns, ';', patternVec);
     do
     {
-        if (getNextFilePath(foundPath).empty())
+        if (getNextFile(foundPath).empty())
             stop = true;
         if (!stop && (strings::startsWith(foundPath, searchPath) || searchPath.empty()))
         {
@@ -268,7 +268,7 @@ bool util::Dirent::rewind(void)
 }
 //>---------------------------------------------------------------------------------------
 
-void util::Dirent::clearList(void)
+void util::Dirent::clear(void)
 {
     m_isRecursive = false;
     m_filePaths.clear();
