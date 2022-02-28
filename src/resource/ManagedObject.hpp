@@ -20,12 +20,9 @@ namespace resource
 
         ManagedObjectBase(const self_type &orig)
         {
-            if (this != &orig)
-            {
-                // m_pManager = orig.m_pManager;
-                m_nameTag = orig.m_nameTag;
-                m_isManaged = orig.m_isManaged;
-            }
+            // m_pManager = orig.m_pManager;
+            m_nameTag = orig.m_nameTag;
+            m_isManaged = orig.m_isManaged;
         }
 
         virtual ~ManagedObjectBase()
@@ -95,12 +92,7 @@ namespace resource
 
         ManagedObject(const self_type &orig)
         {
-            if (this != &orig)
-            {
-                m_isManaged = orig.m_isManaged;
-                m_handle = orig.m_handle;
-                m_nameTag = orig.m_nameTag;
-            }
+            m_handle = orig.m_handle;
         }
 
         virtual ~ManagedObject() {}

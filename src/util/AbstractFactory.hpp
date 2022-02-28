@@ -3,7 +3,8 @@
 
 #include <unordered_map>
 #include <functional>
-#include <string>
+#include <util/Util.hpp>
+#include <util/Vector.hpp>
 
 namespace util
 {
@@ -14,10 +15,19 @@ namespace util
 
     public:
         std::string fileExtension;
+        util::StringVector fileExtensions;
 
     public:
         FactoryObjectBase() : fileExtension() {}
-        FactoryObjectBase(std::string_view fileExt) : fileExtension(fileExt) {}
+        FactoryObjectBase(std::string_view fileExt) : fileExtension(fileExt), fileExtensions()
+        {
+            strings::split(fileExtension, ';', fileExtensions);
+        }
+        FactoryObjectBase(const self_type &orig)
+        {
+            fileExtension = orig.fileExtension;
+            fileExtensions = orig.fileExtensions;
+        }
         virtual ~FactoryObjectBase() {}
 
         virtual void *create(void) = 0;
@@ -36,7 +46,7 @@ namespace util
     public:
         FactoryObject() : base_type() {}
         FactoryObject(std::string_view fileExt) : base_type(fileExt) {}
-        FactoryObject(const self_type &orig) { fileExtension = orig.fileExtension; }
+        FactoryObject(const self_type &orig) {}
 
         virtual ~FactoryObject() {}
 
@@ -85,26 +95,26 @@ namespace util
         }
 
         template <typename TClassType>
-        bool registerObjectType(const key_type &key, std::string_view keyName, std::string_view fileExt = "")
+        bool registerObjectType(const key_type &key, std::string_view keyName, std::string_view fileExtensions = "")
         {
             using UserClass = std::remove_pointer_t<TClassType>;
-            using TagType = typename UserClass::tag_type;
-            TagType::id();          // ensure to bump up the unique id (automatic)
-            TagType::name(keyName); // try to trigger first use of input name
+            using IdType = typename UserClass::universal_id;
+            IdType::id();          // ensure to bump up the unique id (automatic)
+            IdType::name(keyName); // try to trigger first use of input name
             auto it = m_factoryMap.find(key);
             if (it != m_factoryMap.end())
                 return false;
-            m_factoryMap[key] = new FactoryObject<UserClass>(fileExt);
-            m_nameMap[keyName] = key;
+            m_factoryMap[key] = new FactoryObject<UserClass>(fileExtensions);
+            m_nameMap[std::string(keyName)] = key;
             return true;
         }
 
         template <typename TClassType>
-        bool registerObjectType(std::string_view fileExt = "")
+        bool registerObjectType(std::string_view fileExtensions = "")
         {
             using UserClass = std::remove_pointer_t<TClassType>;
-            using TagType = typename UserClass::tag_type;
-            return registerObjectType<UserClass>(TagType::id(), TagType::name(), fileExt);
+            using IdType = typename UserClass::universal_id;
+            return registerObjectType<UserClass>(IdType::id(), IdType::name(), fileExtensions);
         }
 
         bool unregisterObjectType(const key_type &key)
@@ -130,6 +140,17 @@ namespace util
                 return unregisterObjectType(key);
             }
             return false;
+        }
+
+        key_type getKeyTypeForFileExtensions(std::string_view fileExt)
+        {
+            for (auto &it : m_factoryMap)
+            {
+                auto &object = it.second;
+                if (object->fileExtensions.contains(fileExt.data()))
+                    return it.first;
+            }
+            return (key_type)0;
         }
 
         bool isRegistered(const key_type &key) const { return m_factoryMap.find(key) != m_factoryMap.end(); }
