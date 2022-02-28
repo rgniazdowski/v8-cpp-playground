@@ -2,7 +2,9 @@
 #ifndef FG_INC_RESOURCE_CONFIG_JSON
 #define FG_INC_RESOURCE_CONFIG_JSON
 
+#include <util/Vector.hpp>
 #include <util/Tag.hpp>
+#include <util/Util.hpp>
 #include <resource/ResourceConfig.hpp>
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
@@ -60,16 +62,39 @@ namespace resource
 
     void to_json(json &output, const ResourceConfig &input)
     {
-    } //# to_json ResourceConfig
+        auto type = util::Tag<void>::name(input.header.type);
+        // on top convert only meaningful keys (name & type)
+        // everything else comes from mapping
+        output = {{"name", input.header.name},
+                  {"type", type}};
+        for (auto &it : input.mapping)
+        {
+            output[it.first] = it.second;
+        } //> for each mapped resource header
+    }     //# to_json ResourceConfig
     //#-----------------------------------------------------------------------------------
 
     void from_json(const json &input, ResourceConfig &output)
     {
+        static util::StringVector acceptedKeys = {"name", "type"};
+        static util::StringVector rejectedKeys = {"flags", "config", "quality", "mapping"};
         if (!input.is_object())
             return; // cannot do anything
         auto &items = input.items();
-        for (auto &item : items)
+        for (auto &it : items)
         {
+            auto &key = it.key();
+            if (acceptedKeys.contains(key))
+            {
+                if (strings::equals(key.c_str(), "name"))
+                    output.header.name = it.value();
+                else if (strings::equals(key.c_str(), "type"))
+                    output.header.type = util::Tag<void>::id(it.value().get<std::string_view>());
+            }
+            else if (!rejectedKeys.contains(key))
+            {
+                output.mapping.emplace(key, it.value());
+            }
         }
     } //# from_json ResourceConfig
     //#-----------------------------------------------------------------------------------
