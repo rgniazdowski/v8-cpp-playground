@@ -11,7 +11,7 @@ using json = nlohmann::json;
 
 namespace resource
 {
-    void to_json(json &output, const ResourceHeader &input)
+    inline void to_json(json &output, const ResourceHeader &input)
     {
         auto type = util::Tag<void>::name(input.type);
         auto quality = getQualityName(input.quality);
@@ -28,7 +28,7 @@ namespace resource
     } //# to_json ResourceHeader
     //#-----------------------------------------------------------------------------------
 
-    void from_json(const json &input, ResourceHeader &output)
+    inline void from_json(const json &input, ResourceHeader &output)
     {
         if (input.contains("mapping"))
         {
@@ -60,7 +60,7 @@ namespace resource
     } //# from_json ResourceHeader
     //#-----------------------------------------------------------------------------------
 
-    void to_json(json &output, const ResourceConfig &input)
+    inline void to_json(json &output, const ResourceConfig &input)
     {
         auto type = util::Tag<void>::name(input.header.type);
         // on top convert only meaningful keys (name & type)
@@ -74,7 +74,7 @@ namespace resource
     }     //# to_json ResourceConfig
     //#-----------------------------------------------------------------------------------
 
-    void from_json(const json &input, ResourceConfig &output)
+    inline void from_json(const json &input, ResourceConfig &output)
     {
         static util::StringVector acceptedKeys = {"name", "type"};
         static util::StringVector rejectedKeys = {"flags", "config", "quality", "mapping"};

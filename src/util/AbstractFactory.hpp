@@ -142,7 +142,7 @@ namespace util
             return false;
         }
 
-        key_type getKeyTypeForFileExtensions(std::string_view fileExt)
+        key_type getKeyTypeForFileExtension(std::string_view fileExt)
         {
             for (auto &it : m_factoryMap)
             {
