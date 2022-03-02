@@ -1,9 +1,10 @@
 #pragma once
-#ifndef FG_INC_UTIL_GLOBAL_OBJECT_REGISTRY
-#define FG_INC_UTIL_GLOBAL_OBJECT_REGISTRY
+#ifndef FG_INC_RESOURCE_GLOBAL_OBJECT_REGISTRY
+#define FG_INC_RESOURCE_GLOBAL_OBJECT_REGISTRY
 
 #include <Singleton.hpp>
 #include <util/HandleManager.hpp>
+#include <resource/ManagedObject.hpp>
 #include <unordered_map>
 
 namespace util
@@ -29,27 +30,24 @@ namespace util
         using HandleManagersMap = std::unordered_map<uint8_t, WrappedHandleManager>;
 
     protected:
-        template <typename TUserType, typename THandleType>
-        TUserType *dereference(const THandleType &handle)
-        {
-            auto manager = getHandleManager(handle.getTag());
-            return !manager ? nullptr : manager->dereference<TUserType>(handle);
-        }
-
         template <typename TUserType>
-        TUserType *dereference(uint64_t handle)
+        std::remove_pointer_t<TUserType> *dereference(uint64_t handle)
         {
+            using data_type = std::remove_pointer_t<TUserType>;
+            static_assert(std::is_void_v<data_type> || (!std::is_void_v<data_type> && std::is_base_of_v<resource::ManagedObjectBase, data_type>), "TUserType template parameter type needs to be derived from ManagedObjectBase");
             auto manager = getHandleManager(HandleHelper::unpack(handle).tag);
             return !manager ? nullptr : manager->dereference<TUserType>(handle);
         }
 
         template <typename TUserType>
-        TUserType *dereference(const std::string &nameTag)
+        std::remove_pointer_t<TUserType> *dereference(const std::string &nameTag)
         {
+            using data_type = std::remove_pointer_t<TUserType>;
+            static_assert(std::is_void_v<data_type> || (!std::is_void_v<data_type> && std::is_base_of_v<resource::ManagedObjectBase, data_type>), "TUserType template parameter type needs to be derived from ManagedObjectBase");
             for (auto &it : m_handleManagers)
             {
                 // cannot retrieve
-                auto data = it.second.dereference(nameTag);
+                auto data = it.second.dereference<data_type>(nameTag);
                 if (data != nullptr)
                     return data;
             }
@@ -57,10 +55,12 @@ namespace util
         }
 
         template <typename TUserType>
-        TUserType *dereference(NamedHandle &nameTag)
+        std::remove_pointer_t<TUserType> *dereference(NamedHandle &nameTag)
         {
+            using data_type = std::remove_pointer_t<TUserType>;
+            static_assert(std::is_void_v<data_type> || (!std::is_void_v<data_type> && std::is_base_of_v<resource::ManagedObjectBase, data_type>), "TUserType template parameter type needs to be derived from ManagedObjectBase");
             auto manager = getHandleManager(nameTag.getTag());
-            return !manager ? nullptr : manager->dereference<TUserType>(nameTag);
+            return !manager ? nullptr : manager->dereference<data_type>(nameTag);
         }
 
     public:
@@ -69,7 +69,6 @@ namespace util
         {
             using handle_type = THandleType;
             using tag_type = typename handle_type::tag_type;
-            using data_type = typename tag_type::user_type;
             if (hasHandleManager(tag_type::id()))
                 return false;
             if (hasHandleManager(pManager))
@@ -107,34 +106,35 @@ namespace util
         {
             if (has<TUserType>(data))
                 return false;
-            auto &handle = data->getHandle();
+            auto &handle = data->getHandleBase();
             m_registry.emplace(handle.getHandle(), Wrapped{HandleHelper::unpack(handle), handle.getHandle(), data});
             return true;
         }
 
         template <typename TUserType>
-        std::remove_pointer_t<TUserType> *find(const HandleBase &handle) { find<TUserType>(handle.getHandle()); }
+        std::remove_pointer_t<TUserType> *find(const HandleBase &handle) { return find<TUserType>(handle.getHandle()); }
 
         template <typename TUserType>
         std::remove_pointer_t<TUserType> *find(uint64_t handle)
         {
-            std::remove_pointer_t<TUserType> *found = nullptr;
+            using data_type = std::remove_pointer_t<TUserType>;
+            data_type *found = nullptr;
             auto it = m_registry.find(handle);
             if (it != m_registry.end())
-                found = static_cast<std::remove_pointer_t<TUserType> *>(it->second.pointer);
+                found = static_cast<data_type *>(it->second.pointer);
             if (!found)
-                found = dereference<TUserType>(handle);
+                found = this->dereference<data_type>(handle);
             return found;
         }
 
         template <typename TUserType>
         bool has(TUserType *data)
         {
-            auto handle = data->getHandle().getHandle();
+            auto handle = data->getHandleBase().getHandle();
             auto inRegistry = m_registry.find(handle) != m_registry.end();
             if (inRegistry)
                 return true;
-            return dereference<void>(handle) != nullptr;
+            return this->dereference<void>(handle) != nullptr;
         }
 
         bool has(uint64_t handle)
@@ -142,7 +142,7 @@ namespace util
             auto inRegistry = m_registry.find(handle) != m_registry.end();
             if (inRegistry)
                 return true;
-            return dereference<void>(handle) != nullptr;
+            return this->dereference<void>(handle) != nullptr;
         }
 
         bool has(const HandleBase &handle)
@@ -150,7 +150,20 @@ namespace util
             auto inRegistry = m_registry.find(handle.getHandle()) != m_registry.end();
             if (inRegistry)
                 return true;
-            return dereference<void>(handle.getHandle()) != nullptr;
+            return this->dereference<void>(handle.getHandle()) != nullptr;
+        }
+
+        bool has(const std::string &nameTag)
+        {
+            return this->dereference<void>(nameTag) != nullptr;
+        }
+
+        bool has(util::NamedHandle &nameTag)
+        {
+            auto inRegistry = m_registry.find(nameTag.getHandle()) != m_registry.end();
+            if (inRegistry)
+                return true;
+            return this->dereference<void>(nameTag) != nullptr;
         }
 
     protected:
@@ -172,4 +185,4 @@ namespace util
     };
 } //> namespace util
 
-#endif //> FG_INC_UTIL_GLOBAL_OBJECT_REGISTRY
+#endif //> FG_INC_RESOURCE_GLOBAL_OBJECT_REGISTRY

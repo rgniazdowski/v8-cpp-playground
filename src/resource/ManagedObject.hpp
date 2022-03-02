@@ -49,14 +49,16 @@ namespace resource
             return true;
         }
 
-        inline util::NamedHandle &getName(void) { return m_nameTag; }
-
         inline util::NamedHandle const &getName(void) const { return m_nameTag; }
+
+        virtual util::HandleBase const &getHandleBase(void) const = 0;
 
         inline void setManaged(bool toggle = true) { m_isManaged = toggle; }
 
     protected:
         util::NamedHandle m_nameTag;
+
+        inline util::NamedHandle &getName(void) { return m_nameTag; }
 
     private:
         bool m_isManaged;
@@ -101,24 +103,21 @@ namespace resource
         inline void setName(std::string_view name)
         {
             m_nameTag.set<tag_type>(name); // index should stay untouched
-            // m_handle = handle_type(m_nameTag.getIndex(), tag_type::id(), m_nameTag.getHash());
         }
-
-        inline util::NamedHandle &getName(void) { return m_nameTag; }
 
         inline void setHandle(const handle_type &handle)
         {
-            m_nameTag.set<tag_type>(m_handle.getIndex());
+            // just get index, everything else is untouched
+            m_nameTag.set<tag_type>(handle.getIndex());
             m_handle = handle; // overwrite fully
         }
 
         inline handle_type &getHandle(void) { return m_handle; }
 
     public:
-        inline util::NamedHandle const &getName(void) const { return m_nameTag; }
         inline handle_type const &getHandle(void) const { return m_handle; }
+        inline util::HandleBase const &getHandleBase(void) const override { return m_handle; }
 
-        // inline bool isManaged(void) const { return m_isManaged; }
         // inline fg::base::CManager *getManager(void) const { return m_pManager; }
         // inline void setManager(fg::base::CManager *pManager) { m_pManager = pManager; }
 
@@ -131,6 +130,6 @@ namespace resource
         // and changing the name should update only the 'hash' part.
         handle_type m_handle;
     }; //# class ManagedObject
-
 } //> namespace resource
+
 #endif //> FG_INC_MANAGED_OBJECT
