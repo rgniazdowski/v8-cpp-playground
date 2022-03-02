@@ -151,18 +151,22 @@ namespace util
 
     public:
         template <typename TUserType, typename THandleType>
-        TUserType *dereference(const THandleType &handle) { return static_cast<TUserType *>(dereferenceHandle(handle.getHandle())); }
+        TUserType *dereference(const THandleType &handle) const { return static_cast<TUserType *>(dereferenceHandle(handle.getHandle())); }
 
         template <typename TUserType>
-        TUserType *dereference(uint64_t handle) { return static_cast<TUserType *>(dereferenceHandle(handle)); }
+        TUserType *dereference(uint64_t handle) const { return static_cast<TUserType *>(dereferenceHandle(handle)); }
 
         template <typename TUserType>
-        TUserType *dereference(const std::string &nameTag) { return static_cast<TUserType *>(dereferenceString(nameTag)); }
+        TUserType *dereference(const std::string &nameTag) const { return static_cast<TUserType *>(dereferenceString(nameTag)); }
 
         template <typename TUserType>
-        TUserType *dereference(NamedHandle &nameTag) { return static_cast<TUserType *>(dereferenceNamedHandle(nameTag)); }
+        TUserType *dereference(NamedHandle &nameTag) const { return static_cast<TUserType *>(dereferenceNamedHandle(nameTag)); }
 
         void *getManager(void) const { return getHandleManager(); }
+
+        self_type const *self(void) const { return this; }
+
+        self_type *self(void) { return this; }
 
     private:
         using DereferenceHandle = std::function<void *(uint64_t)>;

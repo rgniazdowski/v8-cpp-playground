@@ -566,7 +566,7 @@ namespace util
         template <bool is_pointer = std::is_pointer<ReturnType>::value>
         typename std::enable_if<is_pointer == true>::type wrap(GetterMethod _getter, SetterMethod _setter = nullptr)
         {
-            this->getterWrapped = [_getter](void *pObj) constexpr
+            this->getterWrapped = [_getter](void *pObj)
             {
                 auto value = unpack_caller(static_cast<UserClass *>(pObj), _getter, WrappedValue::Args(0));
                 return WrappedValue::external(&value, value->getIdentifier());
@@ -583,7 +583,7 @@ namespace util
         template <bool is_pointer = std::is_pointer<ReturnType>::value>
         typename std::enable_if<is_pointer == false>::type wrap(GetterMethod _getter, SetterMethod _setter = nullptr)
         {
-            this->getterWrapped = [_getter](void *pObj) constexpr
+            this->getterWrapped = [_getter](void *pObj)
             {
                 auto value = unpack_caller(static_cast<UserClass *>(pObj), _getter, WrappedValue::Args(0));
                 return WrappedValue::wrap(value);
