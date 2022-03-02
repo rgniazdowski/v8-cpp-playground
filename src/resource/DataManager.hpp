@@ -38,22 +38,26 @@ namespace resource
         virtual bool insert(data_type *pData, std::string_view nameTag);
 
         virtual bool rename(data_type *pData, std::string_view newName);
-        virtual bool rename(const handle_type &dhUniqueID, std::string_view newName);
+        bool rename(const handle_type &dhUniqueID, std::string_view newName) { return rename(self_type::get(dhUniqueID), newName); }
 
         virtual bool remove(data_type *pData);
-        virtual bool remove(const handle_type &dhUniqueID);
-        virtual bool remove(const std::string &nameTag);
+        bool remove(const handle_type &dhUniqueID) { return remove(self_type::get(dhUniqueID)); }
+        bool remove(const std::string &nameTag) { return remove(self_type::get(nameTag)); }
+        bool remove(util::NamedHandle &nameTag) { return remove(self_type::get(nameTag)); }
 
         virtual bool destroyData(data_type *&pData);
-        virtual bool destroyData(const handle_type &dhUniqueID);
-        virtual bool destroyData(const std::string &nameTag);
+        bool destroyData(const handle_type &dhUniqueID);
+        bool destroyData(const std::string &nameTag);
+        bool destroyData(util::NamedHandle &nameTag);
 
         virtual data_type *get(const handle_type &dhUniqueID);
         virtual data_type *get(const std::string &nameTag);
+        virtual data_type *get(util::NamedHandle &nameTag);
 
         virtual bool isManaged(data_type *pData);
-        virtual bool isManaged(const handle_type &dhUniqueID);
-        virtual bool isManaged(const std::string &nameTag);
+        inline bool isManaged(const handle_type &dhUniqueID) { return isManaged(self_type::get(dhUniqueID)); }
+        inline bool isManaged(const std::string &nameTag) { return isManaged(self_type::get(nameTag)); }
+        inline bool isManaged(util::NamedHandle &nameTag) { return isManaged(self_type::get(nameTag)); }
     }; //# class DataManagerBase
 } //> namespace resource
 
@@ -71,7 +75,6 @@ bool resource::DataManagerBase<THandleType>::insert(data_type *pData, std::strin
         // FG_MessageSubsystem->reportError(tag_type::name(), FG_ERRNO_RESOURCE_ALREADY_MANAGED, FG_MSG_IN_FUNCTION);
         return false;
     }
-
     if (!pData->getHandle().isNull())
     {
         // Resource has already initialized handle
@@ -109,35 +112,9 @@ bool resource::DataManagerBase<THandleType>::rename(data_type *pData, std::strin
 }
 
 template <typename THandleType>
-bool resource::DataManagerBase<THandleType>::rename(const handle_type &dhUniqueID, std::string_view nameTag)
-{
-    return true;
-}
-
-template <typename THandleType>
 bool resource::DataManagerBase<THandleType>::remove(data_type *pData)
 {
     if (!self_type::isManaged(pData))
-    {
-        return false;
-    }
-    return handle_mgr_type::releaseHandle(pData->getHandle());
-}
-
-template <typename THandleType>
-bool resource::DataManagerBase<THandleType>::remove(const handle_type &dhUniqueID)
-{
-    data_type *pData = self_type::get(dhUniqueID);
-    if (!pData)
-        return false;
-    return handle_mgr_type::releaseHandle(pData->getHandle());
-}
-
-template <typename THandleType>
-bool resource::DataManagerBase<THandleType>::remove(const std::string &nameTag)
-{
-    data_type *pData = self_type::get(nameTag);
-    if (!pData)
         return false;
     return handle_mgr_type::releaseHandle(pData->getHandle());
 }
@@ -182,6 +159,19 @@ bool resource::DataManagerBase<THandleType>::destroyData(const std::string &name
 }
 
 template <typename THandleType>
+bool resource::DataManagerBase<THandleType>::destroyData(util::NamedHandle &nameTag)
+{
+    data_type *pData = handle_mgr_type::dereference(nameTag);
+    if (!remove(pData))
+    {
+        // FG_MessageSubsystem->reportError(tag_type::name(), FG_ERRNO_RESOURCE_REMOVE);
+        return false;
+    }
+    delete pData;
+    return true;
+}
+
+template <typename THandleType>
 typename resource::DataManagerBase<THandleType>::data_type *resource::DataManagerBase<THandleType>::get(const handle_type &dhUniqueID)
 {
     data_type *pData = handle_mgr_type::dereference(dhUniqueID);
@@ -190,6 +180,23 @@ typename resource::DataManagerBase<THandleType>::data_type *resource::DataManage
 
 template <typename THandleType>
 typename resource::DataManagerBase<THandleType>::data_type *resource::DataManagerBase<THandleType>::get(const std::string &nameTag)
+{
+    if (nameTag.empty())
+    {
+        // FG_MessageSubsystem->reportWarning(tag_type::name(), FG_ERRNO_RESOURCE_NAME_TAG_EMPTY, FG_MSG_IN_FUNCTION);
+        return nullptr;
+    }
+    data_type *pData = handle_mgr_type::dereference(nameTag);
+    if (!pData)
+    {
+        // FG_MessageSubsystem->reportError(tag_type::name(), FG_ERRNO_RESOURCE_NAME_TAG_INVALID, " tag='%s', in function: %s", nameTag.c_str(), __FUNCTION__);
+        return nullptr;
+    }
+    return pData;
+}
+
+template <typename THandleType>
+typename resource::DataManagerBase<THandleType>::data_type *resource::DataManagerBase<THandleType>::get(util::NamedHandle &nameTag)
 {
     if (nameTag.empty())
     {
@@ -224,20 +231,6 @@ bool resource::DataManagerBase<THandleType>::isManaged(data_type *pData)
         return false;
     }
     return true;
-}
-
-template <typename THandleType>
-bool resource::DataManagerBase<THandleType>::isManaged(const handle_type &dhUniqueID)
-{
-    data_type *pData = self_type::get(dhUniqueID);
-    return bool(pData != NULL);
-}
-
-template <typename THandleType>
-bool resource::DataManagerBase<THandleType>::isManaged(const std::string &nameTag)
-{
-    data_type *pData = self_type::get(nameTag);
-    return bool(pData != NULL);
 }
 
 #endif //> FG_INC_DATA_MANAGER

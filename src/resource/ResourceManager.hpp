@@ -85,23 +85,19 @@ namespace resource
         Resource *refreshResource(Resource *pResource);
 
     public:
-        virtual bool remove(Resource *pResource);
-
-        bool remove(const ResourceHandle &rhUniqueID) { return remove(base_type::get(rhUniqueID)); }
-        bool remove(const std::string &nameTag) { return remove(base_type::get(nameTag)); }
-        bool remove(const util::NamedHandle &nameTag) { return remove(base_type::get(nameTag)); }
-
-        virtual bool dispose(Resource *pResource);
-
-        bool dispose(const ResourceHandle &rhUniqueID) { return dispose(base_type::get(rhUniqueID)); }
-        bool dispose(const std::string &nameTag) { return dispose(base_type::get(nameTag)); }
-        bool dispose(const util::NamedHandle &nameTag) { return dispose(base_type::get(nameTag)); };
-
         virtual Resource *request(std::string_view info, const ResourceType forcedType = resource::AUTO);
 
-        Resource *get(const ResourceHandle &rhUniqueID) { return refreshResource(base_type::get(rhUniqueID)); }
-        Resource *get(const std::string &nameTag) { return refreshResource(base_type::get(nameTag)); }
-        Resource *get(const util::NamedHandle &nameTag) { return refreshResource(base_type::get(nameTag)); }
+        using base_type::remove;
+        virtual bool remove(Resource *pResource) override;
+
+        virtual bool dispose(Resource *pResource);
+        inline bool dispose(const ResourceHandle &rhUniqueID) { return dispose(base_type::get(rhUniqueID)); }
+        inline bool dispose(const std::string &nameTag) { return dispose(base_type::get(nameTag)); }
+        inline bool dispose(util::NamedHandle &nameTag) { return dispose(base_type::get(nameTag)); }
+
+        virtual inline Resource *get(const ResourceHandle &rhUniqueID) override { return refreshResource(base_type::get(rhUniqueID)); }
+        virtual inline Resource *get(const std::string &nameTag) override { return refreshResource(base_type::get(nameTag)); }
+        virtual inline Resource *get(util::NamedHandle &nameTag) override { return refreshResource(base_type::get(nameTag)); }
 
         // Resource *lockResource(const ResourceHandle &rhUniqueID);
         // bool lockResource(Resource *pResource);

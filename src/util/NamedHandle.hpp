@@ -21,6 +21,8 @@ namespace util
 
         NamedHandle(std::string_view nameTag) : base_type(nameTag), HandleBase(0, 0, calculateHash()), m_isIdxSet(false) {}
 
+        NamedHandle(std::string_view nameTag, uint32_t index) : base_type(nameTag), HandleBase(index, 0, calculateHash()), m_isIdxSet(true) {}
+
         NamedHandle(const NamedHandle &nameTag) : base_type(), HandleBase() { set(nameTag); }
 
         virtual ~NamedHandle()

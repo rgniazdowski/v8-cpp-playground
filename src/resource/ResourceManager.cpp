@@ -291,7 +291,7 @@ resource::Resource *resource::ResourceManager::request(std::string_view info, co
     // This is a fallback, if such resource already exists in the resource manager
     // it should not be searched and reloaded - however do not use request() in a main
     // loop as it may be slower
-    resourcePtr = ResourceManager::get(info);
+    resourcePtr = ResourceManager::get(std::string(info));
     if (resourcePtr)
     {
         // This print will flood output
