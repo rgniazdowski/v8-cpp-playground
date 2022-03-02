@@ -149,6 +149,7 @@ char *util::RegularFile::load(void)
         return nullptr;
     }
     char *fileBuffer = new char[fileSize + 1];
+    memset(fileBuffer, 0, fileSize + 1);
     if (fileBuffer == nullptr)
     {
         // FG_MessageSubsystem->reportError(tag_type::name(), FG_ERRNO, "%s", filePath); // #FIXME - memory error codes
@@ -183,8 +184,7 @@ int64_t util::RegularFile::read(void *buffer, unsigned int elemsize, unsigned in
 {
     if (m_ifs.bad() || !m_ifs.is_open())
         return -1;
-    auto bytesRead = m_ifs.readsome(static_cast<char *>(buffer), elemsize * elemcount);
-    return bytesRead;
+    return m_ifs.read(static_cast<char *>(buffer), elemsize * elemcount).gcount();
 }
 //>---------------------------------------------------------------------------------------
 

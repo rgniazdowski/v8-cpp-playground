@@ -203,6 +203,24 @@ std::string strings::reduce(const std::string &str, const std::string &fill, con
 }
 //>---------------------------------------------------------------------------------------
 
+void strings::replaceAll(std::string &source, const std::string &needle, const std::string &replacer)
+{
+    std::string newString;
+    newString.reserve(source.length()); // avoids a few memory allocations
+    std::string::size_type lastPos = 0;
+    std::string::size_type findPos;
+    while (std::string::npos != (findPos = source.find(needle, lastPos)))
+    {
+        newString.append(source, lastPos, findPos - lastPos);
+        newString += replacer;
+        lastPos = findPos + needle.length();
+    }
+    // Care for the rest after last occurrence
+    newString.append(source, lastPos, source.length() - lastPos);
+    source.swap(newString);
+}
+//>---------------------------------------------------------------------------------------
+
 std::vector<std::string> &strings::split(const std::string &input, char delim, std::vector<std::string> &elems)
 {
     std::stringstream ss(input);
@@ -348,6 +366,8 @@ bool strings::endsWith(const std::string &input, const std::string &pattern, boo
         if ((caseSensitive && input[i] != pattern[p]) ||
             (!caseSensitive && tolower(input[i]) != tolower(pattern[p])))
             return false;
+        if (!i || !p)
+            break;
     }
     return true;
 }
@@ -365,9 +385,9 @@ bool strings::endsWith(const char *input, const char *pattern, bool caseSensitiv
     {
         if ((caseSensitive && input[i] != pattern[p]) ||
             (!caseSensitive && tolower(input[i]) != tolower(pattern[p])))
-        {
             return false;
-        }
+        if (!i || !p)
+            break;
     }
     return true;
 }

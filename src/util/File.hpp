@@ -58,6 +58,12 @@ namespace util
             return RegularFile::modeStr(mode);
         }
 
+        static inline char *loadInPlace(std::string_view filePath)
+        {
+            self_type file(filePath);
+            return file.load();
+        }
+
         //>-------------------------------------------------------------------------------
 
         virtual std::string const &getPath(void) const override

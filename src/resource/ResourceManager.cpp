@@ -2,6 +2,7 @@
 #include <resource/ResourceConfigJson.hpp>
 #include <util/Util.hpp>
 #include <util/File.hpp>
+#include <util/JsonFile.hpp>
 #include <Queue.hpp>
 
 resource::ResourceManager::ResourceManager(base::ManagerBase *pEventMgr) : m_currentResource(),
@@ -356,11 +357,11 @@ resource::Resource *resource::ResourceManager::request(std::string_view info, co
     while (m_dataDir.searchForFile(filePath, "./", pattern, true).length())
     {
         const char *fext = nullptr;
+        const char *fileName = path::fileName(filePath.c_str());
         if (iext)
             fext = iext;
         else
-            fext = path::fileExt(filePath.c_str(), true);
-
+            fext = path::fileExt(fileName, true);
         if (strings::endsWith(fext, "res.json", true))
             isConfig = true;
         else
@@ -375,12 +376,7 @@ resource::Resource *resource::ResourceManager::request(std::string_view info, co
         return nullptr;
     if (isConfig)
     {
-        util::File file(filePath);
-        auto content = file.load();
-        if (!content)
-            return nullptr; //! fixme
-        json jsonConfig = json::parse(content);
-        ResourceHeader config = jsonConfig; // just one resource in file (not mapped resource group)
+        ResourceHeader config = util::JsonFile::loadInPlace(filePath); // just one resource in file (not mapped resource group)
         if (config.name.length())
         {
             if (m_resourceFactory->isRegistered(config.type))

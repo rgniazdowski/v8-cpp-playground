@@ -40,6 +40,8 @@ bool util::Dirent::internal_readZipFile(const std::string &fileName, const std::
             path::join(filePathInZip, filePath, zipFileList[i]);
         else
             path::join(filePathInZip, fileName, zipFileList[i]);
+        strings::replaceAll(filePathInZip, "\\", "/");
+
         std::string dirInZipName;
         // If the path has an ending delimeter the dirName function
         // will return the same string - no changes
@@ -88,6 +90,7 @@ bool util::Dirent::read(bool recursive, bool listZipFiles)
                 bool isDir = dirEntry.is_directory();
                 bool isZip = false;
                 auto &filePath = dirEntry.path().string();
+                strings::replaceAll(filePath, "\\", "/");
                 auto &fileName = dirEntry.path().filename().string();
                 if (fileName[0] == '.' || strings::startsWith(fileName.c_str(), "private", false))
                     continue; // skip private files - these are never loaded
@@ -228,24 +231,18 @@ std::string &util::Dirent::searchForFile(std::string &output,
                     if (pattern[0] == '*')
                     {
                         if (strings::endsWith(filename, (pattern.c_str() + 1), false))
-                        {
                             output = foundPath;
-                        }
                     }
                     else if (pattern[pattern.length() - 1] == '*')
                     {
                         std::string _tmp = pattern.substr(0, pattern.length() - 1);
                         if (strings::startsWith(filename, _tmp.c_str(), false))
-                        {
                             output = foundPath;
-                        }
                     }
                     else
                     {
                         if (pattern.compare(filename) == 0)
-                        {
                             output = foundPath;
-                        }
                     }
                 }
                 else

@@ -30,6 +30,8 @@ namespace resource
 
     inline void from_json(const json &input, ResourceHeader &output)
     {
+        if (!input.is_object() || input.is_null())
+            return;
         if (input.contains("mapping"))
         {
             auto &items = input.at("mapping").items();
@@ -78,7 +80,7 @@ namespace resource
     {
         static util::StringVector acceptedKeys = {"name", "type"};
         static util::StringVector rejectedKeys = {"flags", "config", "quality", "mapping"};
-        if (!input.is_object())
+        if (!input.is_object() || input.is_null())
             return; // cannot do anything
         auto &items = input.items();
         for (auto &it : items)

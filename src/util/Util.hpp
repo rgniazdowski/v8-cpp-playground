@@ -49,6 +49,8 @@ namespace strings
                        const std::string &fill = " ",
                        const std::string &whitespace = " \t\r");
 
+    void replaceAll(std::string &source, const std::string &needle, const std::string &replacer);
+
     std::vector<std::string> &split(const std::string &input, char delim,
                                     std::vector<std::string> &elems);
 
