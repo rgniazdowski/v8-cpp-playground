@@ -6,8 +6,11 @@
 
 namespace util
 {
+    struct HandleHelper;
     class HandleBase
     {
+        friend struct HandleHelper;
+
     protected:
         enum
         {
@@ -38,6 +41,7 @@ namespace util
             uint64_t m_handle; /* read only */
         };
         HandleBase() : m_handle(0) {}
+        HandleBase(uint64_t handle) : m_handle(handle) {}
         HandleBase(uint32_t index, uint8_t tag, uint32_t hash) : m_index(index), m_tag(tag), m_hash(hash) {}
 
     public:
@@ -54,6 +58,35 @@ namespace util
         operator uint64_t(void) const { return m_handle; }
     };
 
+    struct HandleHelper
+    {
+        struct Unpacked
+        {
+            uint32_t index;
+            uint8_t tag;
+            union
+            {
+                uint32_t hash;
+                uint32_t magic;
+            };
+            Unpacked(uint64_t handle)
+            {
+                auto _handle = HandleBase(handle);
+                index = _handle.getIndex();
+                tag = _handle.getTag();
+                hash = _handle.getHash();
+            }
+            Unpacked(const HandleBase &handle)
+            {
+                index = handle.getIndex();
+                tag = handle.getTag();
+                hash = handle.getHash();
+            }
+        };
+        static Unpacked unpack(uint64_t handle) { return Unpacked(handle); }
+        static Unpacked unpack(const HandleBase &handle) { return Unpacked(handle); }
+    };
+
     template <typename TagType>
     class Handle : public HandleBase
     {
@@ -65,30 +98,36 @@ namespace util
         using tag_type = TagType;
 
     public:
-        Handle() : HandleBase(0, TagType::id(), 0) {}
-        Handle(uint32_t index, uint32_t hash) : HandleBase(index, TagType::id(), hash) {}
-        Handle(const self_type &other) { m_handle = other.m_handle; }
+        Handle() : HandleBase(0, tag_type::id(), 0) {}
+        Handle(uint64_t handle) : HandleBase(handle) { m_tag = tag_type::id(); }
+        Handle(uint32_t index, uint32_t hash) : HandleBase(index, tag_type::id(), hash) {}
+        Handle(const self_type &other)
+        {
+            m_handle = other.m_handle;
+            m_tag = tag_type::id(); // setup tag (back to proper if overwritten)
+        }
         virtual ~Handle() { m_handle = 0; }
 
         self_type &operator=(const self_type &other)
         {
             m_handle = other.m_handle;
-            return *this;
-        }
-        self_type &operator=(uint64_t other_handle)
-        {
-            this->m_handle = other_handle;
+            m_tag = tag_type::id(); // setup tag (back to proper if overwritten)
             return *this;
         }
 
-        void copyFrom(const self_type &source) { this->m_handle = source.getHandle(); }
+        self_type &operator=(uint64_t handle)
+        {
+            this->m_handle = handle;
+            m_tag = tag_type::id();
+            return *this;
+        }
 
         bool init(uint32_t index, uint32_t hash = 0)
         {
             if (!isNull() || index > MAX_INDEX)
                 return false;
             m_hash = hash;
-            m_tag = TagType::id(); // set tag, forced
+            m_tag = tag_type::id(); // set tag, forced
             if (!m_hash)
             {
                 static uint32_t s_autoMagic = 0;
@@ -100,8 +139,8 @@ namespace util
             return true;
         }
 
-        static const char *getTagName(void) { return TagType::name(); }
-    }; //# class Handle
+        static const char *getTagName(void) { return tag_type::name(); }
+    }; //# class Handle<TagType>
 } //> namespace util
 
 template <typename TagType>
