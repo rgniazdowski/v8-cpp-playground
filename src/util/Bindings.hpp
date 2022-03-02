@@ -323,7 +323,7 @@ namespace util
             {
                 void *__data = &packed;
                 auto _data = reinterpret_cast<External *>(__data);
-                return convert<T>::convertToPointer(_data->pointer, _data->identifier);
+                return util::convert<T>::convertToPointer(_data->pointer, _data->identifier);
             }
             return nullptr; // nothing else to return
         }

@@ -3,7 +3,7 @@
 #define FG_INC_RESOURCE_CONFIG_JSON
 
 #include <util/Vector.hpp>
-#include <util/Tag.hpp>
+#include <util/UniversalId.hpp>
 #include <util/Util.hpp>
 #include <resource/ResourceConfig.hpp>
 #include <nlohmann/json.hpp>
@@ -13,7 +13,7 @@ namespace resource
 {
     inline void to_json(json &output, const ResourceHeader &input)
     {
-        auto type = util::Tag<void>::name(input.type);
+        auto type = util::UniversalId<void>::name(input.type);
         auto quality = getQualityName(input.quality);
         auto mapping = json::object();
         for (auto &it : input.fileMapping)
@@ -50,7 +50,7 @@ namespace resource
         if (input.contains("config"))
             input.at("config").get_to(output.config);
         if (input.contains("type"))
-            output.type = util::Tag<void>::id(input.at("type").get<std::string_view>());
+            output.type = util::UniversalId<void>::id(input.at("type").get<std::string_view>());
         if (input.contains("quality"))
         {
             auto quality = input.at("quality").get<std::string_view>();
@@ -62,7 +62,7 @@ namespace resource
 
     inline void to_json(json &output, const ResourceConfig &input)
     {
-        auto type = util::Tag<void>::name(input.header.type);
+        auto type = util::UniversalId<void>::name(input.header.type);
         // on top convert only meaningful keys (name & type)
         // everything else comes from mapping
         output = {{"name", input.header.name},
@@ -89,7 +89,7 @@ namespace resource
                 if (strings::equals(key.c_str(), "name"))
                     output.header.name = it.value();
                 else if (strings::equals(key.c_str(), "type"))
-                    output.header.type = util::Tag<void>::id(it.value().get<std::string_view>());
+                    output.header.type = util::UniversalId<void>::id(it.value().get<std::string_view>());
             }
             else if (!rejectedKeys.contains(key))
             {

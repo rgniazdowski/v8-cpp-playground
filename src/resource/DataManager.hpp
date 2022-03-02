@@ -59,6 +59,87 @@ namespace resource
         inline bool isManaged(const std::string &nameTag) { return isManaged(self_type::get(nameTag)); }
         inline bool isManaged(util::NamedHandle &nameTag) { return isManaged(self_type::get(nameTag)); }
     }; //# class DataManagerBase
+
+    class WrappedDataManager
+    {
+    public:
+        using self_type = WrappedDataManager;
+
+        WrappedDataManager(const self_type &other)
+        {
+            m_getDataManager = other.m_getDataManager;
+            m_dereferenceHandle = other.m_dereferenceHandle;
+            m_dereferenceString = other.m_dereferenceString;
+            m_dereferenceNamedHandle = other.m_dereferenceNamedHandle;
+        }
+
+        WrappedDataManager(self_type &&other)
+        {
+            m_getDataManager = std::move(other.m_getDataManager);
+            m_dereferenceHandle = std::move(other.m_dereferenceHandle);
+            m_dereferenceString = std::move(other.m_dereferenceString);
+            m_dereferenceNamedHandle = std::move(other.m_dereferenceNamedHandle);
+        }
+
+        ~WrappedDataManager() {}
+
+    protected:
+        WrappedDataManager() {}
+
+    public:
+        template <typename THandleType>
+        static self_type wrap(DataManagerBase<THandleType> *pManager)
+        {
+            using handle_type = THandleType;
+            using tag_type = typename handle_type::tag_type;
+            using data_type = typename tag_type::user_type;
+            WrappedDataManager self;
+            // custom lambdas are used to obfuscate the real type used underneath -
+            // DataManagerBase is a template class, we need to call dereference on a given
+            // manager without specifying original template parameters.
+            // This forces to static cast back and forth to void, but it is guaranteed that
+            // return type is a pointer and a proper handle manager was wrapped at all.
+            self.m_dereferenceHandle = [pManager](uint64_t handle)
+            { return static_cast<void *>(pManager->get(THandleType(handle))); };
+            self.m_dereferenceString = [pManager](const std::string &nameTag)
+            { return static_cast<void *>(pManager->get(nameTag)); };
+            self.m_dereferenceNamedHandle = [pManager](util::NamedHandle &nameTag)
+            { return static_cast<void *>(pManager->get(nameTag)); };
+            self.m_getDataManager = [pManager]()
+            { return static_cast<void *>(pManager); };
+            return self;
+        }
+
+    public:
+        template <typename TUserType, typename THandleType>
+        TUserType *dereference(const THandleType &handle) const { return static_cast<TUserType *>(m_dereferenceHandle(handle.getHandle())); }
+
+        template <typename TUserType>
+        TUserType *dereference(uint64_t handle) const { return static_cast<TUserType *>(m_dereferenceHandle(handle)); }
+
+        template <typename TUserType>
+        TUserType *dereference(const std::string &nameTag) const { return static_cast<TUserType *>(m_dereferenceString(nameTag)); }
+
+        template <typename TUserType>
+        TUserType *dereference(util::NamedHandle &nameTag) const { return static_cast<TUserType *>(m_dereferenceNamedHandle(nameTag)); }
+
+        void *getManager(void) const { return m_getDataManager(); }
+
+        self_type const *self(void) const { return this; }
+
+        self_type *self(void) { return this; }
+
+    private:
+        using DereferenceHandle = std::function<void *(uint64_t)>;
+        using DereferenceString = std::function<void *(const std::string &)>;
+        using DereferenceNamedHandle = std::function<void *(util::NamedHandle &)>;
+        using GetDataManager = std::function<void *()>;
+
+        GetDataManager m_getDataManager;
+        DereferenceHandle m_dereferenceHandle;
+        DereferenceString m_dereferenceString;
+        DereferenceNamedHandle m_dereferenceNamedHandle;
+    }; //# class WrappedHandleManager
 } //> namespace resource
 
 template <typename THandleType>
