@@ -42,6 +42,7 @@ option(USING_V8PP ${FG_USING_V8PP_MSG} ON)
 option(USING_CPPBTREE ${FG_USING_CPPBTREE_MSG} OFF)
 option(USING_ZEROMQ ${FG_USING_ZEROMQ_MSG} ON)
 option(USING_MINIZIP_NG ${FG_USING_MINIZIP_NG_MSG} ON)
+option(USING_TESTING "Use testing framework and build tests" ON)
 
 find_package(V8 CONFIG REQUIRED)
 set(V8_INCLUDE_DIRS ${V8_INCLUDE_DIR}) # for possible compatibility with different packages
@@ -217,3 +218,22 @@ configure_file (
 include_directories("${PROJECT_BINARY_DIR}")
 
 subdirs(src)
+
+if(USING_TESTING)
+    CPMAddPackage(
+        NAME Catch2
+        GITHUB_REPOSITORY catchorg/Catch2
+        VERSION 2.13.8
+        OPTIONS
+        "CATCH_BUILD_EXAMPLES OFF"
+        "CATCH_BUILD_STATIC_LIBRARY ON"
+        "CATCH_INSTALL_HELPERS ON"
+        "CATCH_INSTALL_DOCS ON"
+    )
+    if(NOT Catch2_ADDED)
+        message(FATAL "Unable to add Catch2 for unit testing")
+    endif()
+    list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/contrib)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

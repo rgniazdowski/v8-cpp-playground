@@ -2,6 +2,23 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "CMake Run Tests - Windows",
+            "command": "cmake",
+            "args": [
+                "--build",
+                ".",
+                "--target",
+                "RUN_TESTS",
+                "--config",
+                "Debug"
+            ],
+            "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder}/build/"
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "CMake Build All - Windows (Debug)",
             "command": "cmake",
             "args": [
