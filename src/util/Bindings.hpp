@@ -40,7 +40,7 @@ namespace util
         };
 
         static std::string_view enum_name(Type type) { return magic_enum::enum_name(type); }
-        static Type enum_value(const std::string &name)
+        static Type enum_value(std::string_view name)
         {
             auto type = magic_enum::enum_cast<Type>(name);
             return (type.has_value() ? type.value() : Type::INVALID);
@@ -348,7 +348,7 @@ namespace util
         };
 
         static std::string_view enum_name(Type type) { return magic_enum::enum_name(type); }
-        static Type enum_value(const std::string &name)
+        static Type enum_value(std::string_view name)
         {
             auto type = magic_enum::enum_cast<Type>(name);
             return (type.has_value() ? type.value() : Type::INVALID);
@@ -359,7 +359,7 @@ namespace util
         std::string name;
 
     protected:
-        BindInfo(const std::string &_name, Type _type) : name(_name), type(_type) {}
+        BindInfo(std::string_view _name, Type _type) : name(_name), type(_type) {}
 
         virtual ~BindInfo() {}
 
@@ -421,7 +421,7 @@ namespace util
         virtual ~BindInfoMethodWrapped() {}
 
         template <class UserClass>
-        WrappedValue *callWrapped(UserClass *pObj, const WrappedValue::Args &args)
+        WrappedValue *callWrapped(UserClass *pObj, const WrappedValue::Args &args) const
         {
             if (wrappedFunction)
                 return wrappedFunction(static_cast<void *>(pObj), args);
@@ -471,7 +471,7 @@ namespace util
         }
 
     public:
-        BindInfoMethod(const std::string &methodName, DirectMethod methodMember, const std::initializer_list<std::string> &argNames = {}) : BindInfo(methodName, METHOD), BindInfoMethodWrapped()
+        BindInfoMethod(std::string_view methodName, DirectMethod methodMember, const std::initializer_list<std::string> &argNames = {}) : BindInfo(methodName, METHOD), BindInfoMethodWrapped()
         {
             this->setupParameters(argNames, {std::string(typeid(Args).name())...});
             this->returnType.assign(typeid(ReturnType).name());
@@ -481,7 +481,7 @@ namespace util
 
         ~BindInfoMethod() {}
 
-        ReturnType call(UserClass *pObj, Args &&...args)
+        ReturnType call(UserClass *pObj, Args &&...args) const
         {
             if (this->type == METHOD && this->direct)
             {
@@ -490,7 +490,7 @@ namespace util
             throw std::invalid_argument("Unable to call member method - it's a property");
         }
 
-        ReturnType callWithArgs(UserClass *pObj, WrappedValue::Args &args)
+        ReturnType callWithArgs(UserClass *pObj, WrappedValue::Args &args) const
         {
             if (this->type == METHOD && this->direct)
                 return unpack_caller(pObj, this->direct, args);
@@ -528,7 +528,7 @@ namespace util
         }
 
         template <class UserClass>
-        void setWrapped(UserClass *pObj, const WrappedValue::Args &args)
+        void setWrapped(UserClass *pObj, const WrappedValue::Args &args) const
         {
             if (setterWrapped)
                 setterWrapped(static_cast<void *>(pObj), args);
@@ -581,13 +581,13 @@ namespace util
         }
 
     public:
-        BindInfoProperty(const std::string &propertyName, GetterMethod _getter, SetterMethod _setter) : BindInfo(propertyName, PROPERTY), BindInfoPropertyWrapped(), getter(_getter), setter(_setter)
+        BindInfoProperty(std::string_view propertyName, GetterMethod _getter, SetterMethod _setter) : BindInfo(propertyName, PROPERTY), BindInfoPropertyWrapped(), getter(_getter), setter(_setter)
         {
             this->valueType.assign(typeid(ReturnType).name());
             this->wrap(_getter, _setter);
         }
 
-        BindInfoProperty(const std::string &propertyName, GetterMethod _getter) : BindInfo(propertyName, PROPERTY), BindInfoPropertyWrapped(), getter(_getter), setter(nullptr)
+        BindInfoProperty(std::string_view propertyName, GetterMethod _getter) : BindInfo(propertyName, PROPERTY), BindInfoPropertyWrapped(), getter(_getter), setter(nullptr)
         {
             this->valueType.assign(typeid(ReturnType).name());
             this->wrap(_getter, nullptr);
@@ -605,10 +605,10 @@ namespace util
         }
 
         template <bool is_void = std::is_void<ReturnType>::value, class InputType>
-        typename std::enable_if<is_void == true>::type set(UserClass *pObj, const InputType &value) {}
+        typename std::enable_if<is_void == true>::type set(UserClass *pObj, const InputType &value) const {}
 
         template <bool is_void = std::is_void<ReturnType>::value, class InputType>
-        typename std::enable_if<is_void == false>::type set(UserClass *pObj, const InputType &value)
+        typename std::enable_if<is_void == false>::type set(UserClass *pObj, const InputType &value) const
         {
             if (this->type == PROPERTY && this->setter)
                 ((pObj)->*(this->setter))(value);
@@ -666,7 +666,7 @@ namespace util
         }
 
     public:
-        BindInfoVariable(const std::string &variableName, DecayedVariable _var) : BindInfo(variableName, VARIABLE), BindInfoVariableWrapped(), var(_var)
+        BindInfoVariable(std::string_view variableName, DecayedVariable _var) : BindInfo(variableName, VARIABLE), BindInfoVariableWrapped(), var(_var)
         {
             this->valueType.assign(typeid(VarType).name());
             this->wrap(this);
@@ -682,10 +682,10 @@ namespace util
         }
 
         template <bool is_void = std::is_void<VarType>::value>
-        typename std::enable_if<is_void == true>::type set(UserClass *pObj, const DecayedVarType &value) {}
+        typename std::enable_if<is_void == true>::type set(UserClass *pObj, const DecayedVarType &value) const {}
 
         template <bool is_void = std::is_void<VarType>::value>
-        typename std::enable_if<is_void == false>::type set(UserClass *pObj, const DecayedVarType &value)
+        typename std::enable_if<is_void == false>::type set(UserClass *pObj, const DecayedVarType &value) const
         {
             if (this->type == VARIABLE && this->var)
                 pObj->*(this->var) = value;
@@ -712,7 +712,7 @@ namespace util
 
     public:
         static std::string_view enum_name(Type type) { return magic_enum::enum_name(type); }
-        static Type enum_value(const std::string &name)
+        static Type enum_value(std::string_view name)
         {
             auto type = magic_enum::enum_cast<Type>(name);
             return (type.has_value() ? type.value() : Type::UNSET);
@@ -763,32 +763,35 @@ namespace util
         BindInfo::Bindings bindings;
 
     public:
-        MetadataBindings(const std::string &_typeName) : typeName(_typeName), bindings() {}
+        MetadataBindings(std::string_view _typeName) : typeName(_typeName), bindings() {}
 
         const std::string &getTypeName(void) const noexcept { return typeName; }
 
         const BindInfo::Bindings &getBindings(void) const noexcept { return bindings; }
 
         template <class UserClass, typename ReturnType, typename... Args>
-        self_type &method(const std::string &methodName, ReturnType (UserClass::*methodMember)(Args...), const std::initializer_list<std::string> &argNames = {})
+        self_type &method(std::string_view methodName, ReturnType (UserClass::*methodMember)(Args...), const std::initializer_list<std::string> &argNames = {})
         {
             bindings.push_back(new BindInfoMethod<UserClass, ReturnType, Args...>(methodName, methodMember, argNames));
             return *this;
         }
+
         template <class UserClass, typename ReturnType>
-        self_type &property(const std::string &propertyName, ReturnType (UserClass::*getter)() const, void (UserClass::*setter)(ReturnType))
+        self_type &property(std::string_view propertyName, ReturnType (UserClass::*getter)() const, void (UserClass::*setter)(ReturnType))
         {
             bindings.push_back(new BindInfoProperty<UserClass, ReturnType>(propertyName, getter, setter));
             return *this;
         }
+
         template <class UserClass, typename ReturnType>
-        self_type &property(const std::string &propertyName, ReturnType (UserClass::*getter)() const)
+        self_type &property(std::string_view propertyName, ReturnType (UserClass::*getter)() const)
         {
             bindings.push_back(new BindInfoProperty<UserClass, ReturnType>(propertyName, getter));
             return *this;
         }
+
         template <class UserClass, typename VarType>
-        self_type &variable(const std::string &variableName, VarType UserClass::*var)
+        self_type &variable(std::string_view variableName, VarType UserClass::*var)
         {
             bindings.push_back(new BindInfoVariable<UserClass, VarType>(variableName, var));
             return *this;
@@ -801,19 +804,23 @@ namespace util
             return found != bindings.end();
         }
 
-        bool has(BindInfo::Type type, const std::string &name) const
+        bool has(BindInfo::Type type, std::string_view name) const
         {
             return (get(type, name) != nullptr);
         }
 
-        BindInfo *get(BindInfo::Type type, const std::string &name) const
+        const BindInfo *get(BindInfo::Type type, std::string_view name) const
         {
             auto found = std::find_if(bindings.begin(), bindings.end(), [&type, &name](BindInfo *const &binding)
                                       { return binding->getType() == type && binding->getName().compare(name) == 0; });
-            if (found != bindings.end())
-                return *found;
-            else
-                return nullptr;
+            return found != bindings.end() ? *found : nullptr;
+        }
+
+        const BindInfo *operator[](std::string_view name) const
+        {
+            auto found = std::find_if(bindings.begin(), bindings.end(), [&name](BindInfo *const &binding)
+                                      { return binding->getName().compare(name) == 0; });
+            return found != bindings.end() ? *found : nullptr;
         }
     }; //# class MetadataBindings
     //#-----------------------------------------------------------------------------------
@@ -837,11 +844,11 @@ namespace util
 
         virtual ~BindingsInvokerBase() {}
 
-        virtual WrappedValue *callWrapped(const std::string &name, WrappedValue::Args &args) = 0;
+        virtual WrappedValue *callWrapped(std::string_view name, WrappedValue::Args &args) = 0;
 
-        virtual WrappedValue *getWrapped(const std::string &name) = 0;
+        virtual WrappedValue *getWrapped(std::string_view name) = 0;
 
-        virtual void setWrapped(const std::string &name, WrappedValue::Args &args) = 0;
+        virtual void setWrapped(std::string_view name, WrappedValue::Args &args) = 0;
 
         virtual bool executeAction(WrappedAction &action) = 0;
     }; //# class BindingsInvokerBase
@@ -865,12 +872,12 @@ namespace util
 
     public:
         template <typename ReturnType, typename... Args>
-        ReturnType call(const std::string &name, Args &&...args)
+        ReturnType call(std::string_view name, Args &&...args)
         {
             auto pBinding = pMetadata->get(BindInfo::METHOD, name);
             if (pBinding != nullptr)
             {
-                auto pBindingCast = static_cast<BindInfoMethod<UserClass, ReturnType, Args...> *>(pBinding);
+                auto pBindingCast = static_cast<const BindInfoMethod<UserClass, ReturnType, Args...> *>(pBinding);
                 return pBindingCast->call(pObj, std::forward<Args>(args)...); // direct
                 // return util::bound_call<UserClass, ReturnType, Args...>(pBinding, pObj, std::forward<Args>(args)...);
             }
@@ -878,41 +885,41 @@ namespace util
         }
 
         template <typename ReturnType>
-        ReturnType get(const std::string &name)
+        ReturnType get(std::string_view name)
         {
             auto pBinding = pMetadata->get(BindInfo::PROPERTY, name);
             if (pBinding != nullptr)
             {
-                auto pBindingCast = static_cast<BindInfoProperty<UserClass, ReturnType> *>(pBinding); // PROPERTY
-                return pBindingCast->get(pObj);                                                       // direct
+                auto pBindingCast = static_cast<const BindInfoProperty<UserClass, ReturnType> *>(pBinding); // PROPERTY
+                return pBindingCast->get(pObj);                                                             // direct
             }
             pBinding = pMetadata->get(BindInfo::VARIABLE, name);
             if (pBinding != nullptr)
             {
-                auto pBindingCast = static_cast<BindInfoVariable<UserClass, ReturnType> *>(pBinding); // VARIABLE
-                return pBindingCast->get(pObj);                                                       // direct
+                auto pBindingCast = static_cast<const BindInfoVariable<UserClass, ReturnType> *>(pBinding); // VARIABLE
+                return pBindingCast->get(pObj);                                                             // direct
             }
             //    return util::bound_get<UserClass, ReturnType>(pBinding, pObj);
             throw std::invalid_argument("Unable to call get() - not a variable / property");
         }
 
         // template <typename InputType, bool is_pointer = std::is_pointer<InputType>::value, bool is_reference = std::is_reference<InputType>::value>
-        // typename std::enable_if<is_pointer == true || is_reference == false>::type set(const std::string &name, InputType value)
+        // typename std::enable_if<is_pointer == true || is_reference == false>::type set(std::string_view &name, InputType value)
         template <typename InputType>
-        void set(const std::string &name, const InputType &value)
+        void set(std::string_view name, const InputType &value)
         {
             auto pBinding = pMetadata->get(BindInfo::PROPERTY, name);
             if (pBinding != nullptr)
             {
-                auto pBindingCast = static_cast<BindInfoProperty<UserClass, InputType> *>(pBinding); // PROPERTY
-                pBindingCast->set(pObj, value);                                                      // direct
+                auto pBindingCast = static_cast<const BindInfoProperty<UserClass, InputType> *>(pBinding); // PROPERTY
+                pBindingCast->set(pObj, value);                                                            // direct
                 return;
             }
             pBinding = pMetadata->get(BindInfo::VARIABLE, name);
             if (pBinding != nullptr)
             {
-                auto pBindingCast = static_cast<BindInfoVariable<UserClass, InputType> *>(pBinding); // VARIABLE
-                pBindingCast->set(pObj, value);                                                      // direct
+                auto pBindingCast = static_cast<const BindInfoVariable<UserClass, InputType> *>(pBinding); // VARIABLE
+                pBindingCast->set(pObj, value);                                                            // direct
                 return;
             }
             // return util::bound_set(pBinding, pObj, value);
@@ -920,7 +927,7 @@ namespace util
         }
 
         // template <typename InputType, bool is_pointer = std::is_pointer<InputType>::value, bool is_reference = std::is_reference<InputType>::value>
-        // typename std::enable_if<is_pointer == false && is_reference == true>::type set(const std::string &name, const InputType &value)
+        // typename std::enable_if<is_pointer == false && is_reference == true>::type set(std::string_view name, const InputType &value)
         //{
         //     auto pBinding = pMetadata->get(BindInfo::PROPERTY, name);
         //     if (pBinding == nullptr)
@@ -930,49 +937,49 @@ namespace util
         //     throw std::invalid_argument("Unable to call set() - not a variable / property");
         // }
 
-        WrappedValue *callWrapped(const std::string &name, WrappedValue::Args &args) override
+        WrappedValue *callWrapped(std::string_view name, WrappedValue::Args &args) override
         {
             auto pBinding = pMetadata->get(BindInfo::METHOD, name);
             if (pBinding != nullptr)
             {
-                BindInfoMethodWrapped *pBindingCast = dynamic_cast<BindInfoMethodWrapped *>(pBinding);
+                const BindInfoMethodWrapped *pBindingCast = dynamic_cast<const BindInfoMethodWrapped *>(pBinding);
                 return pBindingCast->callWrapped(pObj, args); // pointer - allocated
                 // return util::bound_call_wrapped(pBinding, pObj, args);
             }
             throw std::invalid_argument("Unable to find bound method");
         }
 
-        WrappedValue *getWrapped(const std::string &name) override
+        WrappedValue *getWrapped(std::string_view name) override
         {
             auto pBinding = pMetadata->get(BindInfo::PROPERTY, name);
             if (pBinding != nullptr)
             {
-                BindInfoPropertyWrapped *pBindingCast = dynamic_cast<BindInfoPropertyWrapped *>(pBinding); // PROPERTY
-                return pBindingCast->getWrapped(pObj);                                                     // pointer - allocated
+                const BindInfoPropertyWrapped *pBindingCast = dynamic_cast<const BindInfoPropertyWrapped *>(pBinding); // PROPERTY
+                return pBindingCast->getWrapped(pObj);                                                                 // pointer - allocated
             }
             pBinding = pMetadata->get(BindInfo::VARIABLE, name);
             if (pBinding != nullptr)
             {
-                BindInfoVariableWrapped *pBindingCast = dynamic_cast<BindInfoVariableWrapped *>(pBinding); // VARIABLE
-                return pBindingCast->getWrapped(pObj);                                                     // pointer - allocated
+                const BindInfoVariableWrapped *pBindingCast = dynamic_cast<const BindInfoVariableWrapped *>(pBinding); // VARIABLE
+                return pBindingCast->getWrapped(pObj);                                                                 // pointer - allocated
             }
             // return util::bound_get_wrapped(pBinding, pObj);
             throw std::invalid_argument("Unable to call get() - not a variable / property");
         }
 
-        void setWrapped(const std::string &name, WrappedValue::Args &args) override
+        void setWrapped(std::string_view name, WrappedValue::Args &args) override
         {
             auto pBinding = pMetadata->get(BindInfo::PROPERTY, name);
             if (pBinding != nullptr)
             {
-                BindInfoPropertyWrapped *pBindingCast = dynamic_cast<BindInfoPropertyWrapped *>(pBinding);
+                const BindInfoPropertyWrapped *pBindingCast = dynamic_cast<const BindInfoPropertyWrapped *>(pBinding);
                 pBindingCast->setWrapped(pObj, args);
                 return;
             }
             pBinding = pMetadata->get(BindInfo::VARIABLE, name);
             if (pBinding != nullptr)
             {
-                BindInfoVariableWrapped *pBindingCast = dynamic_cast<BindInfoVariableWrapped *>(pBinding);
+                const BindInfoVariableWrapped *pBindingCast = dynamic_cast<const BindInfoVariableWrapped *>(pBinding);
                 pBindingCast->setWrapped(pObj, args); // wrapped args - no result
                 return;
             }
