@@ -2,11 +2,12 @@
 #ifndef FG_INC_UTIL_BINDINGS
 #define FG_INC_UTIL_BINDINGS
 
+#include <magic_enum.hpp>
+
 #include <typeinfo>
 #include <functional>
 #include <string>
 #include <util/Vector.hpp>
-#include <util/EnumName.hpp>
 #include <util/UnpackCaller.hpp>
 
 namespace util
@@ -38,14 +39,11 @@ namespace util
             EXTERNAL = 17
         };
 
-        static const char *enum_name(Type type)
-        {
-            return ::util::id_to_name<Type>(type, s_typeEnumNames);
-        }
-
+        static std::string_view enum_name(Type type) { return magic_enum::enum_name(type); }
         static Type enum_value(const std::string &name)
         {
-            return ::util::name_to_id<Type>(name, s_typeEnumNames);
+            auto type = magic_enum::enum_cast<Type>(name);
+            return (type.has_value() ? type.value() : Type::INVALID);
         }
 
         static Type determineInternalType(const std::string &typeName)
@@ -88,16 +86,6 @@ namespace util
         }
 
     protected:
-        inline static ::util::IdAndName<Type> s_typeEnumNames[] = {
-            ID_NAME(INVALID),
-            ID_NAME(CHAR), ID_NAME(SIGNED_CHAR), ID_NAME(UNSIGNED_CHAR),
-            ID_NAME(SHORT), ID_NAME(SIGNED_SHORT), ID_NAME(UNSIGNED_SHORT),
-            ID_NAME(INT), ID_NAME(UNSIGNED_INT),
-            ID_NAME(LONG), ID_NAME(UNSIGNED_LONG),
-            ID_NAME(LONG_LONG), ID_NAME(UNSIGNED_LONG_LONG),
-            ID_NAME(FLOAT), ID_NAME(DOUBLE),
-            ID_NAME(BOOL), ID_NAME(STRING), ID_NAME(EXTERNAL)};
-
         struct External
         {
             uint64_t identifier;
@@ -352,25 +340,23 @@ namespace util
         using Bindings = std::vector<BindInfo *>;
         enum Type
         {
+            INVALID = 0x0,
             METHOD = 0x1,
             PROPERTY = 0x2,
-            VARIABLE = 0x4
+            VARIABLE = 0x4,
+            FUNCTION = 0x8
         };
 
-        static const char *enum_name(Type type)
-        {
-            return ::util::id_to_name<Type>(type, s_typeEnumNames);
-        }
-
+        static std::string_view enum_name(Type type) { return magic_enum::enum_name(type); }
         static Type enum_value(const std::string &name)
         {
-            return ::util::name_to_id<Type>(name, s_typeEnumNames);
+            auto type = magic_enum::enum_cast<Type>(name);
+            return (type.has_value() ? type.value() : Type::INVALID);
         }
 
     protected:
         Type type;
         std::string name;
-        inline static ::util::IdAndName<Type> s_typeEnumNames[] = {ID_NAME(METHOD), ID_NAME(PROPERTY), ID_NAME(VARIABLE)};
 
     protected:
         BindInfo(const std::string &_name, Type _type) : name(_name), type(_type) {}
@@ -724,17 +710,12 @@ namespace util
             GET
         } type;
 
-    private:
-        inline static ::util::IdAndName<Type> s_typeEnumNames[] = {ID_NAME(UNSET), ID_NAME(CALL), ID_NAME(SET), ID_NAME(GET)};
-
     public:
-        static const char *enum_name(Type type)
-        {
-            return ::util::id_to_name<Type>(type, s_typeEnumNames);
-        }
+        static std::string_view enum_name(Type type) { return magic_enum::enum_name(type); }
         static Type enum_value(const std::string &name)
         {
-            return ::util::name_to_id<Type>(name, s_typeEnumNames);
+            auto type = magic_enum::enum_cast<Type>(name);
+            return (type.has_value() ? type.value() : Type::UNSET);
         }
 
         BindInfo::Type targetType;
@@ -747,11 +728,6 @@ namespace util
 
         WrappedAction() : type(UNSET), targetType(BindInfo::METHOD), targetName(), objectId(0), objectTypeName(), args(), result() {}
 
-        // WrappedAction(const WrappedAction &in)
-        //{
-        //     int xd = 0;
-        // }
-
         WrappedAction(WrappedAction &&in) : type(std::exchange(in.type, UNSET)),
                                             targetType(std::exchange(in.targetType, BindInfo::METHOD)),
                                             targetName(std::move(in.targetName)),
@@ -761,7 +737,6 @@ namespace util
                                             result(std::move(in.result)),
                                             nonce(std::move(in.nonce))
         {
-            int xyz = 123;
         }
 
         ~WrappedAction()
