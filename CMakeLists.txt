@@ -1,10 +1,13 @@
 cmake_minimum_required(VERSION 3.13)
 
 project(testV8use)
-
+message(STATUS "System name: ${CMAKE_SYSTEM_NAME}")
+message(STATUS "Processor: ${CMAKE_SYSTEM_PROCESSOR}")
+message(STATUS "Generator: ${CMAKE_GENERATOR} / ${CMAKE_GENERATOR_PLATFORM}")
 cmake_policy(SET CMP0078 NEW)
 cmake_policy(SET CMP0086 NEW)
 include(cmake/ConfigureBuildType.cmake)
+include(cmake/DetectAndConfigurePlatform.cmake)
 include(cmake/CPM.cmake)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/ ${CMAKE_SOURCE_DIR})
@@ -25,7 +28,7 @@ if(VCPKG_EXE MATCHES "VCPKG_EXE-NOTFOUND")
     message(FATAL_ERROR "Could not find VCPKG executable on the system - please properly configure the PATH system variable")
 else()
     message(STATUS "VCPKG executable was found: ${VCPKG_EXE}")
-    endif()
+endif()
 
 file(MAKE_DIRECTORY ${BINARY_MODULES_DIR})
 
@@ -47,7 +50,6 @@ option(USING_TESTING "Use testing framework and build tests" ON)
 find_package(V8 CONFIG REQUIRED)
 set(V8_INCLUDE_DIRS ${V8_INCLUDE_DIR}) # for possible compatibility with different packages
 
-message(STATUS "")
 CPMAddPackage(
     NAME magic_enum
     GITHUB_REPOSITORY Neargye/magic_enum
@@ -56,7 +58,9 @@ CPMAddPackage(
 if (magic_enum_ADDED)
     set(FG_ALL_INCLUDE_DIRS ${FG_ALL_INCLUDE_DIRS} ${magic_enum_SOURCE_DIR}/include)
 endif()
-
+if(OS MATCHES "windows")
+    set(FG_ALL_LIBRARIES ${FG_ALL_LIBRARIES} winmm.lib)
+endif() # OS
 #
 # 
 if(USING_MINIZIP_NG)

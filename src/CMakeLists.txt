@@ -4,9 +4,12 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 
 message(STATUS "Include: '${FG_ALL_INCLUDE_DIRS}'")
 message(STATUS "Libraries: '${FG_ALL_LIBRARIES}'")
+message(STATUS "Parallel level: '${CMAKE_BUILD_PARALLEL_LEVEL}'")
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
-
+if("${CMAKE_BUILD_PARALLEL_LEVEL}" STREQUAL "")
+    set(CMAKE_BUILD_PARALLEL_LEVEL "8")
+endif()
 #
 # Main sources (core lib & code)
 set(FlexiGame_FG_Main_Headers
@@ -36,11 +39,16 @@ add_executable(${EXECUTABLE_NAME}
     ${FlexiGame_FG_Main_Headers}
     ${FlexiGame_FG_Main_Sources}
 )
+
 ## Target libraries - FG_ALL_LIBRARIES contains everything
-target_link_libraries(${EXECUTABLE_NAME} PUBLIC ${FG_ALL_LIBRARIES} winmm.lib)
+target_link_libraries(${EXECUTABLE_NAME} PUBLIC ${FG_ALL_LIBRARIES})
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE V8::V8)
 target_compile_features(${EXECUTABLE_NAME} PRIVATE cxx_std_17)
-set_target_properties(${EXECUTABLE_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+if(OS MATCHES "windows")
+    set_target_properties(${EXECUTABLE_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+    set_target_properties(${EXECUTABLE_NAME} PROPERTIES VS_CONFIGURATION_TYPE "Application")
+    target_compile_options(${EXECUTABLE_NAME} PRIVATE /MP${CMAKE_BUILD_PARALLEL_LEVEL})
+endif() # OS
 
 message(STATUS "Output (bin): ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 
