@@ -133,7 +133,6 @@ namespace util
             void *_data = &packed;
             InputType *holder = static_cast<InputType *>(_data);
             *holder = value; // directly paste it in
-            printf("WrappedValue(%p)::set() - tname='%s' type='%s' value='%d'\n", this, tname.c_str(), enum_name(type).data(), packed.i_val);
         }
 
         template <>
@@ -181,13 +180,11 @@ namespace util
 
         WrappedValue(const char *_tname) : tname(_tname), type(WrappedValue::determineInternalType(_tname))
         {
-            printf("WrappedValue(%p)::WrappedValue(%s)\n", this, _tname);
             std::fill_n((uint8_t *)(&packed), sizeof(packed), static_cast<uint8_t>(0));
         }
 
         WrappedValue(const char *_tname, void *_external, uint64_t _handle) : tname(_tname), type(EXTERNAL)
         {
-            printf("WrappedValue(%p)::WrappedValue(%s, %p, %llu)\n", this, _tname, _external, _handle);
             std::fill_n((uint8_t *)(&packed), sizeof(packed), static_cast<uint8_t>(0));
             packed.external.pointer = _external;
             packed.external.handle = _handle;
@@ -206,7 +203,6 @@ namespace util
             tname = input.tname;
             type = input.type;
             strvalue = input.strvalue;
-            printf("WrappedValue(%p)::WrappedValue(%p/copy-assign) - tname='%s' type='%s' value='%d'\n", this, &input, tname.c_str(), enum_name(type).data(), packed.i_val);
             return *this;
         }
 
@@ -220,7 +216,6 @@ namespace util
                 std::copy_n(&input.packed, 1, &packed); // copy one structure
                 std::fill_n((uint8_t *)(&input.packed), sizeof(input.packed), static_cast<uint8_t>(0));
                 input.type = WrappedValue::INVALID;
-                printf("WrappedValue(%p)::WrappedValue(%p/move-assign) - tname='%s' type='%s' value='%d'\n", this, &input, tname.c_str(), enum_name(type).data(), packed.i_val);
             }
             return *this;
         }
@@ -231,7 +226,6 @@ namespace util
             tname = input.tname;
             type = input.type;
             strvalue = input.strvalue;
-            printf("WrappedValue(%p)::WrappedValue(%p/copy) - tname='%s' type='%s' value='%d'\n", this, &input, tname.c_str(), enum_name(type).data(), packed.i_val);
         }
 
         WrappedValue(WrappedValue &&input) : type(input.type),
@@ -241,12 +235,10 @@ namespace util
             std::copy_n(&input.packed, 1, &packed); // copy one structure
             std::fill_n((uint8_t *)(&input.packed), sizeof(input.packed), static_cast<uint8_t>(0));
             input.type = WrappedValue::INVALID;
-            printf("WrappedValue(%p)::WrappedValue(%p/move) - tname='%s' type='%s' value='%d'\n", this, &input, tname.c_str(), enum_name(type).data(), packed.i_val);
         }
 
         void reset(void)
         {
-            printf("WrappedValue(%p)::~WrappedValue() - tname='%s' type='%s'\n", this, tname.c_str(), enum_name(type).data());
             std::fill_n((uint8_t *)(&packed), sizeof(packed), static_cast<uint8_t>(0));
             type = INVALID;
             tname.clear();
