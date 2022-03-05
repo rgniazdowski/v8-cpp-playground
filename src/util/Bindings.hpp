@@ -15,8 +15,6 @@ namespace util
     class WrappedValue
     {
     public:
-        using Args = std::vector<WrappedValue *>;
-
         enum Type
         {
             INVALID = 0,
@@ -88,7 +86,7 @@ namespace util
     protected:
         struct External
         {
-            uint64_t identifier;
+            uint64_t handle;
             void *pointer;
         };
         union
@@ -115,12 +113,14 @@ namespace util
 
         constexpr bool isValid(void) const noexcept { return type != INVALID; }
 
+        constexpr bool isEmpty(void) const noexcept { return type == INVALID; }
+
         constexpr Type getType(void) const noexcept { return type; }
 
-        constexpr uint64_t getExternalIdentifier(void) const
+        constexpr uint64_t getExternalHandle(void) const
         {
             if (type == EXTERNAL)
-                return packed.external.identifier;
+                return packed.external.handle;
             return 0;
         }
 
@@ -133,6 +133,7 @@ namespace util
             void *_data = &packed;
             InputType *holder = static_cast<InputType *>(_data);
             *holder = value; // directly paste it in
+            printf("WrappedValue(%p)::set() - tname='%s' type='%s' value='%d'\n", this, tname.c_str(), enum_name(type).data(), packed.i_val);
         }
 
         template <>
@@ -175,58 +176,78 @@ namespace util
     public:
         WrappedValue() : tname(), type(INVALID)
         {
-            memset(&packed, 0, sizeof(packed));
+            std::fill_n((uint8_t *)(&packed), sizeof(packed), static_cast<uint8_t>(0));
         }
 
         WrappedValue(const char *_tname) : tname(_tname), type(WrappedValue::determineInternalType(_tname))
         {
-            memset(&packed, 0, sizeof(packed));
+            printf("WrappedValue(%p)::WrappedValue(%s)\n", this, _tname);
+            std::fill_n((uint8_t *)(&packed), sizeof(packed), static_cast<uint8_t>(0));
         }
 
-        WrappedValue(const char *_tname, void *_external, uint64_t _id) : tname(_tname), type(EXTERNAL)
+        WrappedValue(const char *_tname, void *_external, uint64_t _handle) : tname(_tname), type(EXTERNAL)
         {
-            memset(&packed, 0, sizeof(packed));
+            printf("WrappedValue(%p)::WrappedValue(%s, %p, %llu)\n", this, _tname, _external, _handle);
+            std::fill_n((uint8_t *)(&packed), sizeof(packed), static_cast<uint8_t>(0));
             packed.external.pointer = _external;
-            packed.external.identifier = _id;
+            packed.external.handle = _handle;
         }
 
         WrappedValue(const std::string &str, const char *_tname) : tname(_tname), type(STRING), strvalue(str)
         {
-            memset(&packed, 0, sizeof(packed));
+            std::fill_n((uint8_t *)(&packed), sizeof(packed), static_cast<uint8_t>(0));
         }
 
         ~WrappedValue() { reset(); }
 
         WrappedValue &operator=(const WrappedValue &input)
         {
-            memset(&packed, 0, sizeof(packed));
-            memcpy(&packed, &input.packed, sizeof(packed));
+            std::copy_n(&input.packed, 1, &packed); // copy one structure
             tname = input.tname;
             type = input.type;
             strvalue = input.strvalue;
+            printf("WrappedValue(%p)::WrappedValue(%p/copy-assign) - tname='%s' type='%s' value='%d'\n", this, &input, tname.c_str(), enum_name(type).data(), packed.i_val);
+            return *this;
+        }
+
+        WrappedValue &operator=(WrappedValue &&input)
+        {
+            if (this != &input)
+            {
+                type = input.type;
+                tname = std::move(input.tname);
+                strvalue = std::move(input.strvalue);
+                std::copy_n(&input.packed, 1, &packed); // copy one structure
+                std::fill_n((uint8_t *)(&input.packed), sizeof(input.packed), static_cast<uint8_t>(0));
+                input.type = WrappedValue::INVALID;
+                printf("WrappedValue(%p)::WrappedValue(%p/move-assign) - tname='%s' type='%s' value='%d'\n", this, &input, tname.c_str(), enum_name(type).data(), packed.i_val);
+            }
             return *this;
         }
 
         WrappedValue(const WrappedValue &input)
         {
-            memset(&packed, 0, sizeof(packed));
-            memcpy(&packed, &input.packed, sizeof(packed));
+            std::copy_n(&input.packed, 1, &packed); // copy one structure
             tname = input.tname;
             type = input.type;
             strvalue = input.strvalue;
+            printf("WrappedValue(%p)::WrappedValue(%p/copy) - tname='%s' type='%s' value='%d'\n", this, &input, tname.c_str(), enum_name(type).data(), packed.i_val);
         }
 
-        WrappedValue(WrappedValue &&input) : type(std::exchange(input.type, WrappedValue::INVALID)),
-                                             tname(std::move(tname)),
-                                             strvalue(std::move(strvalue))
+        WrappedValue(WrappedValue &&input) : type(input.type),
+                                             tname(std::move(input.tname)),
+                                             strvalue(std::move(input.strvalue))
         {
-            input.packed.external.identifier = 0;
-            input.packed.external.pointer = nullptr;
+            std::copy_n(&input.packed, 1, &packed); // copy one structure
+            std::fill_n((uint8_t *)(&input.packed), sizeof(input.packed), static_cast<uint8_t>(0));
+            input.type = WrappedValue::INVALID;
+            printf("WrappedValue(%p)::WrappedValue(%p/move) - tname='%s' type='%s' value='%d'\n", this, &input, tname.c_str(), enum_name(type).data(), packed.i_val);
         }
 
         void reset(void)
         {
-            memset(&packed, 0, sizeof(packed));
+            printf("WrappedValue(%p)::~WrappedValue() - tname='%s' type='%s'\n", this, tname.c_str(), enum_name(type).data());
+            std::fill_n((uint8_t *)(&packed), sizeof(packed), static_cast<uint8_t>(0));
             type = INVALID;
             tname.clear();
             strvalue.clear();
@@ -235,8 +256,16 @@ namespace util
         template <typename InputType>
         static WrappedValue *wrap(const InputType &value)
         {
-            WrappedValue *wrapped = new WrappedValue(typeid(value).name());
-            wrapped->set(value);
+            WrappedValue *pWrapped = new WrappedValue(typeid(value).name());
+            pWrapped->set(value);
+            return pWrapped;
+        }
+
+        template <typename InputType>
+        static WrappedValue wrapStruct(const InputType &value)
+        {
+            WrappedValue wrapped = WrappedValue(typeid(value).name());
+            wrapped.set(value);
             return wrapped;
         }
 
@@ -246,23 +275,32 @@ namespace util
             return new WrappedValue(value, typeid(value).name());
         }
 
-        // template <unsigned int N>
-        // static WrappedValue *wrap(const char (&value)[N])
-        //{
-        //     /* outside of template */
-        //     return new WrappedValue(std::string(value), typeid(value).name());
-        // }
+        template <>
+        static WrappedValue wrapStruct(const std::string &value)
+        {
+            return WrappedValue(value, typeid(value).name());
+        }
 
         static WrappedValue *wrap(const char *value)
         {
-            /* outside of template */
             return new WrappedValue(std::string(value), typeid(value).name());
+        }
+
+        static WrappedValue wrapStruct(const char *value)
+        {
+            return WrappedValue(std::string(value), typeid(value).name());
         }
 
         template <typename T>
         static WrappedValue *external(T **value, uint64_t id)
         {
             return new WrappedValue(typeid(T *).name(), !value ? nullptr : *value, id);
+        }
+
+        template <typename T>
+        static WrappedValue externalCopy(T **value, uint64_t id)
+        {
+            return WrappedValue(typeid(T *).name(), !value ? nullptr : *value, id);
         }
 
         //--------------------------------------------------------------------------------
@@ -311,14 +349,16 @@ namespace util
             {
                 void *__data = &packed;
                 auto _data = reinterpret_cast<External *>(__data);
-                return util::convert<T>::convertToPointer(_data->pointer, _data->identifier);
+                return util::convert<T>::convertToPointer(_data->pointer, _data->handle);
             }
             return nullptr; // nothing else to return
         }
+
+        using Args = std::vector<WrappedValue *>;
     }; //# class WrappedValue
     //#-----------------------------------------------------------------------------------
 
-    void reset_arguments(WrappedValue::Args &args)
+    WrappedValue::Args &reset_arguments(WrappedValue::Args &args)
     {
         for (auto idx = 0; idx < args.size(); idx++)
         {
@@ -327,6 +367,7 @@ namespace util
             args[idx] = nullptr;
         }
         args.clear();
+        return args;
     }
     //#-----------------------------------------------------------------------------------
 
@@ -437,7 +478,7 @@ namespace util
     {
     public:
         using base_type = BindInfoFunctionWrappedBase;
-        using WrappedFunction = std::function<WrappedValue *(const WrappedValue::Args &)>;
+        using WrappedFunction = std::function<WrappedValue(const WrappedValue::Args &)>;
 
     protected:
         WrappedFunction wrappedFunction;
@@ -448,11 +489,11 @@ namespace util
                                 std::string_view _returnType) : base_type(names, types, _returnType), wrappedFunction() {}
         virtual ~BindInfoFunctionWrapped() {}
 
-        WrappedValue *callWrapped(const WrappedValue::Args &args) const
+        WrappedValue callWrapped(const WrappedValue::Args &args) const
         {
             if (wrappedFunction)
                 return wrappedFunction(args);
-            return nullptr;
+            return WrappedValue(); // empty
         }
     }; //# BindInfoMethodWrapped
     //#-----------------------------------------------------------------------------------
@@ -478,7 +519,7 @@ namespace util
             this->wrappedFunction = [function](const WrappedValue::Args &args)
             {
                 auto value = unpack_caller(function, args);
-                return WrappedValue::external(&value, value->getIdentifier());
+                return WrappedValue::externalCopy(&value, value->getHandleBase().getHandle());
             };
         }
 
@@ -488,7 +529,7 @@ namespace util
             this->wrappedFunction = [function](const WrappedValue::Args &args)
             {
                 auto value = unpack_caller(function, args);
-                return WrappedValue::wrap(value);
+                return WrappedValue::wrapStruct(value);
             };
         }
 
@@ -539,7 +580,7 @@ namespace util
     {
     public:
         using base_type = BindInfoFunctionWrappedBase;
-        using WrappedMethod = std::function<WrappedValue *(void *, const WrappedValue::Args &)>;
+        using WrappedMethod = std::function<WrappedValue(void *, const WrappedValue::Args &)>;
 
     protected:
         WrappedMethod wrappedMethod;
@@ -551,11 +592,11 @@ namespace util
         virtual ~BindInfoMethodWrapped() {}
 
         template <class UserClass>
-        WrappedValue *callWrapped(UserClass *pObj, const WrappedValue::Args &args) const
+        WrappedValue callWrapped(UserClass *pObj, const WrappedValue::Args &args) const
         {
             if (wrappedMethod)
                 return wrappedMethod(static_cast<void *>(pObj), args);
-            return nullptr;
+            return WrappedValue(); // empty
         }
 
     }; //# BindInfoMethodWrapped
@@ -582,7 +623,7 @@ namespace util
             this->wrappedMethod = [methodMember](void *pObj, const WrappedValue::Args &args)
             {
                 auto value = unpack_caller(static_cast<UserClass *>(pObj), methodMember, args);
-                return WrappedValue::external(&value, value->getIdentifier());
+                return WrappedValue::externalCopy(&value, value->getHandleBase().getHandle());
             };
         }
 
@@ -592,7 +633,7 @@ namespace util
             this->wrappedMethod = [methodMember](void *pObj, const WrappedValue::Args &args)
             {
                 auto value = unpack_caller(static_cast<UserClass *>(pObj), methodMember, args);
-                return WrappedValue::wrap(value);
+                return WrappedValue::wrapStruct(value);
             };
         }
 
@@ -647,7 +688,7 @@ namespace util
             this->wrappedMethod = [function](void *pObj, const WrappedValue::Args &args)
             {
                 auto value = unpack_caller(function, args);
-                return WrappedValue::external(&value, value->getIdentifier());
+                return WrappedValue::externalCopy(&value, value->getHandleBase().getHandle());
             };
         }
 
@@ -657,7 +698,7 @@ namespace util
             this->wrappedMethod = [function](void *pObj, const WrappedValue::Args &args)
             {
                 auto value = unpack_caller(function, args);
-                return WrappedValue::wrap(value);
+                return WrappedValue::wrapStruct(value);
             };
         }
 
@@ -699,7 +740,7 @@ namespace util
     class BindInfoPropertyWrapped
     {
     public:
-        using GetterWrappedFunction = std::function<WrappedValue *(void *pObj)>;
+        using GetterWrappedFunction = std::function<WrappedValue(void *pObj)>;
         using SetterWrappedFunction = std::function<void(void *pObj, const WrappedValue::Args &)>;
 
     protected:
@@ -712,12 +753,12 @@ namespace util
         virtual ~BindInfoPropertyWrapped() {}
 
         template <class UserClass>
-        WrappedValue *getWrapped(UserClass *pObj) const
+        WrappedValue getWrapped(UserClass *pObj) const
         {
             if (getterWrapped)
                 return getterWrapped(static_cast<void *>(pObj));
             else
-                return nullptr;
+                return WrappedValue(); // empty
         }
 
         template <class UserClass>
@@ -748,7 +789,7 @@ namespace util
             this->getterWrapped = [_getter](void *pObj)
             {
                 auto value = unpack_caller(static_cast<UserClass *>(pObj), _getter, WrappedValue::Args(0));
-                return WrappedValue::external(&value, value->getIdentifier());
+                return WrappedValue::externalCopy(&value, value->getHandleBase().getHandle());
             };
             if (_setter != nullptr)
             {
@@ -765,7 +806,7 @@ namespace util
             this->getterWrapped = [_getter](void *pObj)
             {
                 auto value = unpack_caller(static_cast<UserClass *>(pObj), _getter, WrappedValue::Args(0));
-                return WrappedValue::wrap(value);
+                return WrappedValue::wrapStruct(value);
             };
             this->setterWrapped = [_setter](void *pObj, const WrappedValue::Args &args)
             {
@@ -835,7 +876,7 @@ namespace util
             this->getterWrapped = [pThis](void *pObj)
             {
                 auto value = pThis->get(static_cast<UserClass *>(pObj));
-                return WrappedValue::external(&value, value->getIdentifier());
+                return WrappedValue::externalCopy(&value, value->getHandleBase().getHandle());
             };
 
             this->setterWrapped = [pThis](void *pObj, const WrappedValue::Args &args)
@@ -850,7 +891,7 @@ namespace util
             this->getterWrapped = [pThis](void *pObj)
             {
                 auto value = pThis->get(static_cast<UserClass *>(pObj));
-                return WrappedValue::wrap(value); // ptr
+                return WrappedValue::wrapStruct(value); // struct
             };
             this->setterWrapped = [pThis](void *pObj, const WrappedValue::Args &args)
             {
@@ -939,7 +980,7 @@ namespace util
             targetName.clear();
             objectTypeName.clear();
             nonce.clear();
-            reset_arguments(args);
+            util::reset_arguments(args);
         }
 
         constexpr bool isValid(void) const { return type != UNSET && objectId > 0 && !targetName.empty(); }
@@ -1044,9 +1085,9 @@ namespace util
 
         virtual ~BindingsInvokerBase() {}
 
-        virtual WrappedValue *callWrapped(std::string_view name, const WrappedValue::Args &args) = 0;
+        virtual WrappedValue callWrapped(std::string_view name, const WrappedValue::Args &args) = 0;
 
-        virtual WrappedValue *getWrapped(std::string_view name) = 0;
+        virtual WrappedValue getWrapped(std::string_view name) = 0;
 
         virtual void setWrapped(std::string_view name, const WrappedValue::Args &args) = 0;
 
@@ -1132,7 +1173,7 @@ namespace util
         //#-------------------------------------------------------------------------------
 
         template <typename UserClass>
-        static WrappedValue *callWrapped(UserClass *pObject, const BindInfo *pBinding, const WrappedValue::Args &args)
+        static WrappedValue callWrapped(UserClass *pObject, const BindInfo *pBinding, const WrappedValue::Args &args)
         {
             if (pBinding->isMethod() && pObject != nullptr)
             {
@@ -1149,7 +1190,7 @@ namespace util
         //#-------------------------------------------------------------------------------
 
         template <typename UserClass>
-        static WrappedValue *getWrapped(UserClass *pObject, const BindInfo *pBinding)
+        static WrappedValue getWrapped(UserClass *pObject, const BindInfo *pBinding)
         {
             if (pBinding->isProperty() && pObject != nullptr)
             {
@@ -1249,7 +1290,7 @@ namespace util
         //     throw std::invalid_argument("Unable to call set() - not a variable / property");
         // }
 
-        WrappedValue *callWrapped(std::string_view name, const WrappedValue::Args &args) override
+        WrappedValue callWrapped(std::string_view name, const WrappedValue::Args &args) override
         {
             auto pBinding = pMetadata->get(BindInfo::METHOD, name);
             if (!pBinding)
@@ -1259,7 +1300,7 @@ namespace util
             throw std::invalid_argument("Unable to find bound method / function");
         }
 
-        WrappedValue *getWrapped(std::string_view name) override
+        WrappedValue getWrapped(std::string_view name) override
         {
             auto pBinding = pMetadata->get(BindInfo::PROPERTY, name);
             if (!pBinding)
@@ -1295,18 +1336,12 @@ namespace util
             //
             // action contains wrapped value for result - before executing it should be cleared
             action.result.reset();
-            WrappedValue *pResult = nullptr;
             if (action.type == WrappedAction::CALL)
-                pResult = this->callWrapped(action.targetName, action.args);
+                action.result = this->callWrapped(action.targetName, action.args);
             else if (action.type == WrappedAction::GET)
-                pResult = this->getWrapped(action.targetName);
+                action.result = this->getWrapped(action.targetName);
             else if (action.type == WrappedAction::SET)
                 this->setWrapped(action.targetName, action.args);
-            if (pResult != nullptr)
-            {
-                action.result = *pResult; // copy result to target
-                delete pResult;           // clear allocated result
-            }
             return true;
         }
     }; //# class BindingsInvoker

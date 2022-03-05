@@ -74,12 +74,10 @@ TEST_CASE("Invoke function bindings manually", "[bindings]")
     CHECK(pBinding->call(123, "Hello World!") == expectedResult);
     CHECK(pBinding->callWithArgs(args) == expectedResult);
 
-    auto pWrappedResult = pBinding->callWrapped(args);
-    CHECK(pWrappedResult->get<int>() == expectedResult);
-    delete pWrappedResult;
-    pWrappedResult = util::BindingHelper::callWrapped<void>(nullptr, pBinding, args);
-    CHECK(pWrappedResult->get<int>() == expectedResult);
-    delete pWrappedResult;
+    auto wrappedResult = pBinding->callWrapped(args);
+    CHECK(wrappedResult.get<int>() == expectedResult);
+    wrappedResult = util::BindingHelper::callWrapped<void>(nullptr, pBinding, args);
+    CHECK(wrappedResult.get<int>() == expectedResult);
 
     delete pBinding;
     util::reset_arguments(args);

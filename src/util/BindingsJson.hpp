@@ -106,7 +106,7 @@ namespace util
         std::string typeName = input.getTypeName();
         output["typeName"] = typeName;
         output["type"] = WrappedValue::enum_name(input.getType());
-        output["external"] = {{"identifier", input.getExternalIdentifier()}};
+        output["external"] = {{"handle", input.getExternalHandle()}};
         // WrappedValue::external_struct
         if (!input.isExternal())
         {
@@ -123,7 +123,7 @@ namespace util
         WrappedValue::Type type = WrappedValue::INVALID;
         std::string typeName;
         std::string typestr;
-        uint64_t identifier = 0;
+        uint64_t handle = 0;
         json value;
         if (input.contains("typeName"))
             input.at("typeName").get_to(typeName);
@@ -137,10 +137,10 @@ namespace util
             if (input.contains("external"))
             {
                 auto external = input.at("external");
-                if (external.contains("identifier"))
+                if (external.contains("handle"))
                 {
-                    external.at("identifier").get_to(identifier);
-                    output = WrappedValue(typeName.c_str(), nullptr, identifier);
+                    external.at("handle").get_to(handle);
+                    output = WrappedValue(typeName.c_str(), nullptr, handle);
                 }
             }
         }
@@ -191,8 +191,6 @@ namespace util
         output = json::array(); // force array type ?
         for (auto &arg : input)
         {
-            // json value = json::object();
-            // to_json(value, *arg);    // element is WrappedValue*, dereference it
             const WrappedValue &value = *arg;
             output.push_back(value); // append to array
         }
@@ -205,7 +203,7 @@ namespace util
             return; // cannot do anything without an array
         for (auto &element : input)
         {
-            WrappedValue *pWrapped = new WrappedValue("");
+            WrappedValue *pWrapped = new WrappedValue();
             from_json(element, *pWrapped);
             output.push_back(pWrapped);
         }
