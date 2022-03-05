@@ -17,6 +17,7 @@ namespace util
             using type = typename std::tuple_element<i, std::tuple<Args...>>::type;
         };
     };
+    //#-----------------------------------------------------------------------------------
 
     template <typename T>
     struct function_traits_impl;
@@ -122,6 +123,7 @@ namespace util
     };
     template <size_t N>
     using BuildIndices = typename build_indices<N>::type;
+    //#-----------------------------------------------------------------------------------
 
     namespace details
     {
@@ -137,6 +139,7 @@ namespace util
             assert(args.size() >= Traits::arity);
             return func(*args[I]...);
         }
+        //#-------------------------------------------------------------------------------
         template <typename ClassType,
                   typename FuncType,
                   typename VecType,
@@ -151,6 +154,7 @@ namespace util
             assert(args.size() >= Traits::arity);
             return (obj->*func)(*args[I]...);
         }
+        //#-------------------------------------------------------------------------------
     } // namespace details
 
     template <typename FuncType,
@@ -162,6 +166,8 @@ namespace util
     {
         return details::do_call(func, args, BuildIndices<Traits::arity>());
     }
+    //#-----------------------------------------------------------------------------------
+
     template <typename ClassType,
               typename FuncType,
               typename VecType,
@@ -174,6 +180,7 @@ namespace util
     {
         return details::do_call(obj, func, args, BuildIndices<Traits::arity>());
     }
+    //#-----------------------------------------------------------------------------------
 } //> namespace util
 
 #endif //> FG_INC_UTIL_UNPACK_CALLER
