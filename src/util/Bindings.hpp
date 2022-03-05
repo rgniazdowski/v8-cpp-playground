@@ -613,7 +613,7 @@ namespace util
         {
             if (this->type == METHOD && this->direct)
             {
-                return ((pObj)->*(this->direct))(std::forward<Args>(args)...); // call anyway
+                return (pObj->*(this->direct))(std::forward<Args>(args)...); // call anyway
             }
             throw std::invalid_argument("Unable to call member method - it's a property");
         }
@@ -625,6 +625,71 @@ namespace util
             throw std::invalid_argument("Unable to call member method - it's a property");
         }
     }; //# class BindInfoMethod
+    //#-----------------------------------------------------------------------------------
+
+    /**
+     * @brief
+     *
+     * @tparam ReturnType
+     * @tparam Args
+     */
+    template <typename ReturnType, typename... Args>
+    class BindInfoMethod<void, ReturnType, Args...> : public BindInfo, public virtual BindInfoMethodWrapped
+    {
+        using DirectMethod = ReturnType (*)(Args...);
+
+    private:
+        DirectMethod direct;
+
+        template <bool is_pointer = std::is_pointer<ReturnType>::value>
+        typename std::enable_if<is_pointer == true>::type wrap(DirectMethod function)
+        {
+            this->wrappedMethod = [function](void *pObj, const WrappedValue::Args &args)
+            {
+                auto value = unpack_caller(function, args);
+                return WrappedValue::external(&value, value->getIdentifier());
+            };
+        }
+
+        template <bool is_pointer = std::is_pointer<ReturnType>::value>
+        typename std::enable_if<is_pointer == false>::type wrap(DirectMethod function)
+        {
+            this->wrappedMethod = [function](void *pObj, const WrappedValue::Args &args)
+            {
+                auto value = unpack_caller(function, args);
+                return WrappedValue::wrap(value);
+            };
+        }
+
+    public:
+        BindInfoMethod(std::string_view functionName,
+                       DirectMethod function,
+                       const std::initializer_list<std::string> &argNames = {})
+            : BindInfo(functionName, METHOD),
+              BindInfoMethodWrapped(argNames, {std::string(typeid(Args).name())...}, typeid(ReturnType).name()),
+              direct(function)
+        {
+            this->wrap(function);
+        }
+
+        virtual ~BindInfoMethod() {}
+
+        ReturnType call(void *pObj, Args &&...args) const
+        {
+            if (this->type == METHOD && this->direct)
+            {
+                return this->direct(std::forward<Args>(args)...); // call anyway
+            }
+            throw std::invalid_argument("Unable to call member method - it's a property");
+        }
+
+        ReturnType callWithArgs(void *pObj, const WrappedValue::Args &args) const
+        {
+            if (this->type == METHOD && this->direct)
+                return unpack_caller(this->direct, args);
+            throw std::invalid_argument("Unable to call member method - it's a property");
+        }
+    }; //# class BindInfoMethod<void>
     //#-----------------------------------------------------------------------------------
 
     /**
@@ -898,6 +963,13 @@ namespace util
         const BindInfo::Bindings &getBindings(void) const noexcept { return bindings; }
 
         template <class UserClass, typename ReturnType, typename... Args>
+        self_type &function(std::string_view functionName, ReturnType (*function)(Args...), const std::initializer_list<std::string> &argNames = {})
+        {
+            bindings.push_back(new BindInfoFunction<ReturnType, Args...>(functionName, function, argNames));
+            return *this;
+        }
+
+        template <class UserClass, typename ReturnType, typename... Args>
         self_type &method(std::string_view methodName, ReturnType (UserClass::*methodMember)(Args...), const std::initializer_list<std::string> &argNames = {})
         {
             bindings.push_back(new BindInfoMethod<UserClass, ReturnType, Args...>(methodName, methodMember, argNames));
@@ -982,21 +1054,152 @@ namespace util
     }; //# class BindingsInvokerBase
     //#-----------------------------------------------------------------------------------
 
+    struct BindingHelper
+    {
+        BindingHelper() = delete;
+        BindingHelper(const BindingHelper &other) = delete;
+        //#-------------------------------------------------------------------------------
+
+        template <typename ReturnType, typename UserClass, typename... Args>
+        static ReturnType call(UserClass *pObject, const BindInfo *pBinding, Args &&...args)
+        {
+            if (pBinding->isFunction())
+                return BindingHelper::callFunction<ReturnType, Args...>(pBinding, std::forward<Args>(args)...);
+            if (pBinding->isMethod())
+                return BindingHelper::callMethod<ReturnType, UserClass, Args...>(pObject, pBinding, std::forward<Args>(args)...);
+            throw std::invalid_argument("Unable to call binding - not a function / method");
+        }
+        //#-------------------------------------------------------------------------------
+
+        template <typename ReturnType, typename... Args>
+        static ReturnType callFunction(const BindInfo *pBinding, Args &&...args)
+        {
+            if (pBinding->isFunction())
+            {
+                auto pBindingCast = static_cast<const BindInfoFunction<ReturnType, Args...> *>(pBinding);
+                return pBindingCast->call(std::forward<Args>(args)...); // direct
+            }
+            throw std::invalid_argument("Unable to call binding - not a function");
+        }
+        //#-------------------------------------------------------------------------------
+
+        template <typename ReturnType, typename UserClass, typename... Args>
+        static ReturnType callMethod(UserClass *pObject, const BindInfo *pBinding, Args &&...args)
+        {
+            if (pBinding->isMethod())
+            {
+                auto pBindingCast = static_cast<const BindInfoMethod<UserClass, ReturnType, Args...> *>(pBinding);
+                return pBindingCast->call(pObject, std::forward<Args>(args)...); // direct
+            }
+            throw std::invalid_argument("Unable to call binding - not a method");
+        }
+        //#-------------------------------------------------------------------------------
+
+        template <typename ReturnType, typename UserClass>
+        static ReturnType get(UserClass *pObject, const BindInfo *pBinding)
+        {
+            if (pBinding->isProperty())
+            {
+                auto pBindingCast = static_cast<const BindInfoProperty<UserClass, ReturnType> *>(pBinding); // PROPERTY
+                return pBindingCast->get(pObject);                                                          // direct
+            }
+            if (pBinding->isVariable())
+            {
+                auto pBindingCast = static_cast<const BindInfoVariable<UserClass, ReturnType> *>(pBinding); // VARIABLE
+                return pBindingCast->get(pObject);                                                          // direct
+            }
+            throw std::invalid_argument("Unable to call get() - not a variable / property");
+        }
+        //#-------------------------------------------------------------------------------
+
+        template <typename UserClass, typename InputType>
+        static void set(UserClass *pObject, const BindInfo *pBinding, const InputType &value)
+        {
+            if (pBinding->isProperty())
+            {
+                auto pBindingCast = static_cast<const BindInfoProperty<UserClass, InputType> *>(pBinding); // PROPERTY
+                pBindingCast->set(pObject, value);                                                         // direct
+                return;
+            }
+            if (pBinding->isVariable())
+            {
+                auto pBindingCast = static_cast<const BindInfoVariable<UserClass, InputType> *>(pBinding); // VARIABLE
+                pBindingCast->set(pObject, value);                                                         // direct
+                return;
+            }
+            throw std::invalid_argument("Unable to call set() - not a variable / property");
+        }
+        //#-------------------------------------------------------------------------------
+
+        template <typename UserClass>
+        static WrappedValue *callWrapped(UserClass *pObject, const BindInfo *pBinding, const WrappedValue::Args &args)
+        {
+            if (pBinding->isMethod() && pObject != nullptr)
+            {
+                auto pBindingCast = dynamic_cast<const BindInfoMethodWrapped *>(pBinding);
+                return pBindingCast->callWrapped(pObject, args); // pointer - allocated
+            }
+            if (pBinding->isFunction())
+            {
+                auto pBindingCast = dynamic_cast<const BindInfoFunctionWrapped *>(pBinding);
+                return pBindingCast->callWrapped(args);
+            }
+            throw std::invalid_argument("Unable to call binding - not a function / method");
+        }
+        //#-------------------------------------------------------------------------------
+
+        template <typename UserClass>
+        static WrappedValue *getWrapped(UserClass *pObject, const BindInfo *pBinding)
+        {
+            if (pBinding->isProperty() && pObject != nullptr)
+            {
+                const BindInfoPropertyWrapped *pBindingCast = dynamic_cast<const BindInfoPropertyWrapped *>(pBinding); // PROPERTY
+                return pBindingCast->getWrapped(pObject);                                                              // pointer - allocated
+            }
+            if (pBinding->isVariable() && pObject != nullptr)
+            {
+                const BindInfoVariableWrapped *pBindingCast = dynamic_cast<const BindInfoVariableWrapped *>(pBinding); // VARIABLE
+                return pBindingCast->getWrapped(pObject);                                                              // pointer - allocated
+            }
+            throw std::invalid_argument("Unable to call get() - not a variable / property");
+        }
+        //#-------------------------------------------------------------------------------
+
+        template <typename UserClass>
+        static void setWrapped(UserClass *pObject, const BindInfo *pBinding, const WrappedValue::Args &args)
+        {
+            if (pBinding->isProperty() && pObject != nullptr)
+            {
+                const BindInfoPropertyWrapped *pBindingCast = dynamic_cast<const BindInfoPropertyWrapped *>(pBinding);
+                pBindingCast->setWrapped(pObject, args);
+                return;
+            }
+            if (pBinding->isVariable() && pObject != nullptr)
+            {
+                const BindInfoVariableWrapped *pBindingCast = dynamic_cast<const BindInfoVariableWrapped *>(pBinding);
+                pBindingCast->setWrapped(pObject, args); // wrapped args - no result
+                return;
+            }
+            throw std::invalid_argument("Unable to call set() - not a variable / property");
+        }
+        //#-------------------------------------------------------------------------------
+    }; //# struct BindingHelper
+
     template <class UserClass>
     class BindingsInvoker : public BindingsInvokerBase
     {
-        UserClass *pObj;
+        UserClass *pObject;
 
     public:
-        BindingsInvoker(UserClass *object, const MetadataBindings &metadata) : BindingsInvokerBase(metadata), pObj(object) {}
-        BindingsInvoker(UserClass *object, const MetadataBindings *metadata) : BindingsInvokerBase(metadata), pObj(object) {}
+        BindingsInvoker(UserClass *object, const MetadataBindings &metadata) : BindingsInvokerBase(metadata), pObject(object) {}
+        BindingsInvoker(UserClass *object, const MetadataBindings *metadata) : BindingsInvokerBase(metadata), pObject(object) {}
         virtual ~BindingsInvoker()
         {
             pMetadata = nullptr;
-            pObj = nullptr;
+            pObject = nullptr;
         }
 
-        void setObject(UserClass *object) { pObj = object; }
+        void setObject(UserClass *object) { pObject = object; }
 
     public:
         template <typename ReturnType, typename... Args>
@@ -1004,34 +1207,21 @@ namespace util
         {
             auto pBinding = pMetadata->get(BindInfo::METHOD, name);
             if (pBinding != nullptr)
-            {
-                auto pBindingCast = static_cast<const BindInfoMethod<UserClass, ReturnType, Args...> *>(pBinding);
-                return pBindingCast->call(pObj, std::forward<Args>(args)...); // direct
-            }
+                return BindingHelper::callMethod<ReturnType, UserClass, Args...>(pObject, pBinding, std::forward<Args>(args)...); // direct
             pBinding = pMetadata->get(BindInfo::FUNCTION, name);
             if (pBinding != nullptr)
-            {
-                auto pBindingCast = static_cast<const BindInfoFunction<ReturnType, Args...> *>(pBinding);
-                return pBindingCast->call(std::forward<Args>(args)...); // direct
-            }
-            throw std::invalid_argument("Unable to find bound method");
+                return BindingHelper::callFunction<ReturnType, Args...>(pBinding, std::forward<Args>(args)...); // direct
+            throw std::invalid_argument("Unable to find bound method / function");
         }
 
         template <typename ReturnType>
         ReturnType get(std::string_view name)
         {
             auto pBinding = pMetadata->get(BindInfo::PROPERTY, name);
+            if (!pBinding)
+                pBinding = pMetadata->get(BindInfo::VARIABLE, name);
             if (pBinding != nullptr)
-            {
-                auto pBindingCast = static_cast<const BindInfoProperty<UserClass, ReturnType> *>(pBinding); // PROPERTY
-                return pBindingCast->get(pObj);                                                             // direct
-            }
-            pBinding = pMetadata->get(BindInfo::VARIABLE, name);
-            if (pBinding != nullptr)
-            {
-                auto pBindingCast = static_cast<const BindInfoVariable<UserClass, ReturnType> *>(pBinding); // VARIABLE
-                return pBindingCast->get(pObj);                                                             // direct
-            }
+                return BindingHelper::get<ReturnType, UserClass>(pObject, pBinding);
             throw std::invalid_argument("Unable to call get() - not a variable / property");
         }
 
@@ -1041,19 +1231,10 @@ namespace util
         void set(std::string_view name, const InputType &value)
         {
             auto pBinding = pMetadata->get(BindInfo::PROPERTY, name);
+            if (!pBinding)
+                pBinding = pMetadata->get(BindInfo::VARIABLE, name);
             if (pBinding != nullptr)
-            {
-                auto pBindingCast = static_cast<const BindInfoProperty<UserClass, InputType> *>(pBinding); // PROPERTY
-                pBindingCast->set(pObj, value);                                                            // direct
-                return;
-            }
-            pBinding = pMetadata->get(BindInfo::VARIABLE, name);
-            if (pBinding != nullptr)
-            {
-                auto pBindingCast = static_cast<const BindInfoVariable<UserClass, InputType> *>(pBinding); // VARIABLE
-                pBindingCast->set(pObj, value);                                                            // direct
-                return;
-            }
+                return BindingHelper::set<UserClass, InputType>(pObject, pBinding, value);
             throw std::invalid_argument("Unable to call set() - not a variable / property");
         }
 
@@ -1071,53 +1252,30 @@ namespace util
         WrappedValue *callWrapped(std::string_view name, const WrappedValue::Args &args) override
         {
             auto pBinding = pMetadata->get(BindInfo::METHOD, name);
+            if (!pBinding)
+                pBinding = pMetadata->get(BindInfo::FUNCTION, name);
             if (pBinding != nullptr)
-            {
-                auto pBindingCast = dynamic_cast<const BindInfoMethodWrapped *>(pBinding);
-                return pBindingCast->callWrapped(pObj, args); // pointer - allocated
-            }
-            pBinding = pMetadata->get(BindInfo::FUNCTION, name);
-            if (pBinding != nullptr)
-            {
-                auto pBindingCast = dynamic_cast<const BindInfoFunctionWrapped *>(pBinding);
-                return pBindingCast->callWrapped(args);
-            }
-            throw std::invalid_argument("Unable to find bound method");
+                return BindingHelper::callWrapped<UserClass>(pObject, pBinding, args);
+            throw std::invalid_argument("Unable to find bound method / function");
         }
 
         WrappedValue *getWrapped(std::string_view name) override
         {
             auto pBinding = pMetadata->get(BindInfo::PROPERTY, name);
+            if (!pBinding)
+                pBinding = pMetadata->get(BindInfo::VARIABLE, name);
             if (pBinding != nullptr)
-            {
-                const BindInfoPropertyWrapped *pBindingCast = dynamic_cast<const BindInfoPropertyWrapped *>(pBinding); // PROPERTY
-                return pBindingCast->getWrapped(pObj);                                                                 // pointer - allocated
-            }
-            pBinding = pMetadata->get(BindInfo::VARIABLE, name);
-            if (pBinding != nullptr)
-            {
-                const BindInfoVariableWrapped *pBindingCast = dynamic_cast<const BindInfoVariableWrapped *>(pBinding); // VARIABLE
-                return pBindingCast->getWrapped(pObj);                                                                 // pointer - allocated
-            }
+                return BindingHelper::getWrapped<UserClass>(pObject, pBinding);
             throw std::invalid_argument("Unable to call get() - not a variable / property");
         }
 
         void setWrapped(std::string_view name, const WrappedValue::Args &args) override
         {
             auto pBinding = pMetadata->get(BindInfo::PROPERTY, name);
+            if (!pBinding)
+                pBinding = pMetadata->get(BindInfo::VARIABLE, name);
             if (pBinding != nullptr)
-            {
-                const BindInfoPropertyWrapped *pBindingCast = dynamic_cast<const BindInfoPropertyWrapped *>(pBinding);
-                pBindingCast->setWrapped(pObj, args);
-                return;
-            }
-            pBinding = pMetadata->get(BindInfo::VARIABLE, name);
-            if (pBinding != nullptr)
-            {
-                const BindInfoVariableWrapped *pBindingCast = dynamic_cast<const BindInfoVariableWrapped *>(pBinding);
-                pBindingCast->setWrapped(pObj, args); // wrapped args - no result
-                return;
-            }
+                return BindingHelper::setWrapped<UserClass>(pObject, pBinding, args);
             throw std::invalid_argument("Unable to call set() - not a variable / property");
         }
 
@@ -1128,7 +1286,7 @@ namespace util
                 action.result.reset();
                 return false; // skip
             }
-            if (!this->pObj)
+            if (!this->pObject)
                 return false;
             // need to assume that this object (invoker is already prepared and object pointer
             // was externally updated before calling action.
@@ -1139,11 +1297,11 @@ namespace util
             action.result.reset();
             WrappedValue *pResult = nullptr;
             if (action.type == WrappedAction::CALL)
-                pResult = callWrapped(action.targetName, action.args);
+                pResult = this->callWrapped(action.targetName, action.args);
             else if (action.type == WrappedAction::GET)
-                pResult = getWrapped(action.targetName);
+                pResult = this->getWrapped(action.targetName);
             else if (action.type == WrappedAction::SET)
-                setWrapped(action.targetName, action.args);
+                this->setWrapped(action.targetName, action.args);
             if (pResult != nullptr)
             {
                 action.result = *pResult; // copy result to target
