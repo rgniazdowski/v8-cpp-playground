@@ -29,6 +29,18 @@
             "environment": [],
             "console": "newExternalWindow",
             "preLaunchTask": "CMake Build All - Windows (Release)"
-        }
+        },
+        {
+            "name": "(Windows) Debug Unit Tests",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/bin/Debug/unit_tests.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal",
+            "preLaunchTask": "CMake Build All - Windows (Debug)"
+        },
     ]
 }
