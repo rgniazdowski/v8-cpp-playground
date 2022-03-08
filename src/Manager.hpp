@@ -2,6 +2,8 @@
 #ifndef FG_INC_MANAGER
 #define FG_INC_MANAGER
 
+#include <cstdint>
+
 namespace base
 {
     class ManagerBase
