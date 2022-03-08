@@ -18,6 +18,12 @@ set(FlexiGame_FG_Main_Sources
     main.cpp
     test.cpp
     serverx.cpp
+    util/timesys.cpp
+    util/Dirent.cpp
+    util/Util.cpp
+    util/ZipFile.cpp
+    util/RegularFile.cpp
+    util/File.cpp
 )
 
 source_group(main FILES ${FlexiGame_FG_Main_Sources})
