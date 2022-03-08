@@ -25,6 +25,43 @@ namespace util
     void read_directory(std::string_view name, FileNamesVector &vec);
 
     void read_directory(std::string_view name, DirEntriesVector &vec);
+
+    template <class T, class Alloc = std::allocator<T>>
+    bool contains(std::vector<T, Alloc> const &vec, T const &value)
+    {
+        using base_type = std::vector<T, Alloc>;
+        for (typename base_type::const_iterator it = vec.begin(); it != vec.end(); it++)
+        {
+            if ((*it) == value)
+                return true;
+        }
+        return false;
+    }
+
+    template <class T, class Alloc = std::allocator<T>>
+    int find(std::vector<T, Alloc> const &vec, T const &value)
+    {
+        using vec_type = std::vector<T, Alloc>;
+        int idx = 0;
+        for (typename vec_type::const_iterator it = vec.begin(); it != vec.end(); it++, idx++)
+        {
+            if ((*it) == value)
+                return idx;
+        }
+        return -1;
+    }
+
+    template <class T, class Alloc = std::allocator<T>>
+    std::vector<T, Alloc> reverse(std::vector<T, Alloc> const &vec)
+    {
+        using vec_type = std::vector<T, Alloc>;
+        vec_type out;
+        typename self_type::reverse_iterator b = vec.rbegin();
+        typename self_type::reverse_iterator e = vec.rend();
+        for (; b != e; b++)
+            out.push_back(*b);
+        return out;
+    }
 } //> namespace util
 
 namespace strings
