@@ -4,10 +4,11 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 
 add_executable(
     ${UNIT_TESTS_EXE}
+    main.cpp
     bindings.cpp
+    timers.cpp
+    events.cpp
 )
-
-target_compile_definitions(${UNIT_TESTS_EXE} PUBLIC CATCH_CONFIG_MAIN)
 
 target_include_directories(${UNIT_TESTS_EXE} PUBLIC ${Catch2_SOURCE_DIR}/single_include)
 target_include_directories(${UNIT_TESTS_EXE} PUBLIC ${FG_ALL_INCLUDE_DIRS})
