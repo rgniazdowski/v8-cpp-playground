@@ -9,7 +9,7 @@
 
 namespace resource
 {
-    class ManagedObjectBase
+    class ManagedObjectBase : public util::HandledObject
     {
     public:
         using self_type = ManagedObjectBase;

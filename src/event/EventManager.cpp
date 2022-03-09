@@ -5,10 +5,9 @@
 event::EventManager::EventManager() : m_eventBinds(),
                                       m_eventsQueue(),
                                       m_timerEntries(),
+                                      m_cleanupIntervalId(),
                                       m_eventStructs(),
-                                      m_eventStructsFreeSlots(),
-                                      m_argsLists(),
-                                      m_argsListsFreeSlots()
+                                      m_eventStructsFreeSlots()
 {
 }
 //>---------------------------------------------------------------------------------------
@@ -27,11 +26,8 @@ void event::EventManager::pushToFreeSlot(EventBase *ptr)
 }
 //>---------------------------------------------------------------------------------------
 
-void event::EventManager::pushToFreeSlot(WrappedArgs *pArgs)
+void event::EventManager::resetArguments(WrappedArgs &args)
 {
-    if (!pArgs)
-        return;
-    auto &args = *pArgs;
     for (auto &arg : args)
     {
         if (arg->isExternal() && arg->getExternalPointer() != nullptr)
@@ -42,43 +38,22 @@ void event::EventManager::pushToFreeSlot(WrappedArgs *pArgs)
         }
     }
     util::reset_arguments(args);
-    m_argsListsFreeSlots.push_back(pArgs);
 }
 //>---------------------------------------------------------------------------------------
 
 bool event::EventManager::destroy(void)
 {
     for (auto &it : m_eventBinds)
-    {
-        auto &callbacks = it.second;
-        for (auto &callback : callbacks)
-        {
-            if (callback)
-                delete callback;
-            callback = nullptr;
-        }
-        callbacks.clear();
-    }
-
+        this->deleteCallbacks(it.first);
     while (!m_eventsQueue.empty())
     {
-        if (m_eventsQueue.front().args != nullptr)
-        {
-            // delete m_eventsQueue.front().argList;
-            pushToFreeSlot(m_eventsQueue.front().args);
-            m_eventsQueue.front().args = nullptr;
-        }
+        resetArguments(m_eventsQueue.front().args);
         m_eventsQueue.pop();
     }
-
     for (auto &timer : m_timerEntries)
     {
-        // if (timer.args)
-        //     pushToFreeSlot(timeout.argList);
-        // if (timer.)
-        //     delete timeout.callback;
-        // timer.args = nullptr;
-        // timer.callback = nullptr;
+        resetArguments(timer.args); // cleanup arguments (just in case)
+        timer.deactivate();         // mark for removal
     }
     m_eventStructsFreeSlots.clear();
     while (m_eventStructs.size())
@@ -87,19 +62,13 @@ bool event::EventManager::destroy(void)
         delete ptr;
         m_eventStructs.pop_back();
     } //# for each event structure
-    for (auto &pItem : m_argsLists)
-        pushToFreeSlot(pItem);
-    m_argsListsFreeSlots.clear();
-    while (m_argsLists.size())
-    {
-        auto pArgs = m_argsLists.back();
-        if (pArgs)
-            delete pArgs;
-        m_argsLists.pop_back();
-    } //# for each argument list
     m_eventBinds.clear();
+    removeInactiveTimers();
     m_timerEntries.clear();
-    m_init = false;
+    m_eventsQueue.clear();
+    m_eventStructs.clear();
+    m_init = false; // mark as deinitialized
+    m_cleanupIntervalId = 0;
     return true;
 }
 //>---------------------------------------------------------------------------------------
@@ -107,8 +76,8 @@ bool event::EventManager::destroy(void)
 bool event::EventManager::initialize(void)
 {
     m_eventStructs.reserve(INITIAL_PTR_VEC_SIZE);
-    m_argsLists.reserve(INITIAL_PTR_VEC_SIZE);
     m_init = true;
+    m_cleanupIntervalId = addInterval<EventManager, size_t>(-1, 60 * 1000, this, &EventManager::removeInactiveTimers);
     return true;
 }
 //>---------------------------------------------------------------------------------------
@@ -134,25 +103,7 @@ event::EventBase *event::EventManager::requestEventStruct(Type eventType)
 }
 //>---------------------------------------------------------------------------------------
 
-event::WrappedArgs *event::EventManager::requestWrappedArgs(void)
-{
-    WrappedArgs *pArgs = nullptr;
-    if (m_argsListsFreeSlots.empty())
-    {
-        pArgs = new WrappedArgs();
-        m_argsLists.push_back(pArgs);
-    }
-    else
-    {
-        pArgs = m_argsListsFreeSlots.back();
-        util::reset_arguments(*pArgs); //! FIXME
-        m_argsListsFreeSlots.pop_back();
-    }
-    return pArgs;
-}
-//>---------------------------------------------------------------------------------------
-
-event::ThrownEvent &event::EventManager::throwEvent(Type eventCode, WrappedArgs *args)
+event::ThrownEvent &event::EventManager::throwEvent(Type eventCode, WrappedArgs &args)
 {
     m_eventsQueue.emplace(ThrownEvent(eventCode, args));
     return m_eventsQueue.back();
@@ -205,7 +156,7 @@ unsigned int event::EventManager::executeEvent(Type eventCode)
 } //> executeEvent(...)
 //>---------------------------------------------------------------------------------------
 
-unsigned int event::EventManager::executeEvent(const ThrownEvent &thrownEvent)
+unsigned int event::EventManager::executeEvent(ThrownEvent &thrownEvent)
 {
     unsigned int count = 0;
     auto found = m_eventBinds.find(thrownEvent.eventCode);
@@ -216,19 +167,22 @@ unsigned int event::EventManager::executeEvent(const ThrownEvent &thrownEvent)
     {
         if (!callback)
             continue;
-        if (thrownEvent.args)
-            (*callback)(*thrownEvent.args);
+        if (thrownEvent.args.size())
+            (*callback)(thrownEvent.args);
         else
             (*callback)();
         count++;
     } //> for each callback
-    if (thrownEvent.args)
-        pushToFreeSlot(thrownEvent.args);
+    //
+    // Thrown event arguments need to be reset/removed after all events are processed.
+    // If there is an event structure on the argument's list, it will be retrieved and
+    // added back to the free list;
+    resetArguments(thrownEvent.args);
     return count;
 } //> executeEvent(...)
 //>---------------------------------------------------------------------------------------
 
-unsigned int event::EventManager::executeEvent(Type eventCode, WrappedArgs *args)
+unsigned int event::EventManager::executeEvent(Type eventCode, WrappedArgs &args)
 {
     unsigned int count = 0;
     auto found = m_eventBinds.find(eventCode);
@@ -239,14 +193,13 @@ unsigned int event::EventManager::executeEvent(Type eventCode, WrappedArgs *args
     {
         if (!callback)
             continue;
-        if (args)
-            (*callback)(*args);
+        if (args.size())
+            (*callback)(args);
         else
             (*callback)();
         count++;
-    } // for each callback
-    if (args)
-        pushToFreeSlot(args);
+    } //> for each callback
+    resetArguments(args);
     return count;
 } //> executeEvent(...)
 //>---------------------------------------------------------------------------------------
@@ -284,20 +237,22 @@ bool event::EventManager::removeCallback(Type eventCode, util::Callback *pCallba
 } //> removeCallback(...)
 //>---------------------------------------------------------------------------------------
 
-bool event::EventManager::removeCallbacks(Type eventCode)
+event::CallbacksVec event::EventManager::removeCallbacks(Type eventCode)
 {
     if ((int)eventCode < 0)
-        return false;
+        return event::CallbacksVec();
     auto &callbacksVec = m_eventBinds[eventCode];
     if (callbacksVec.empty())
-        return false;
+        return event::CallbacksVec();
+    event::CallbacksVec output;
     auto cit = callbacksVec.begin(), end = callbacksVec.end();
     for (; cit != end; cit++)
     {
+        output.push_back(*cit);
         *cit = nullptr;
     }
     callbacksVec.clear();
-    return true;
+    return output;
 } //> removeCallbacks(...)
 //>---------------------------------------------------------------------------------------
 
@@ -324,36 +279,57 @@ bool event::EventManager::deleteCallback(Type eventCode, util::Callback *&pCallb
 } //> deleteCallback(...)
 //>---------------------------------------------------------------------------------------
 
-bool event::EventManager::deleteCallbacks(Type eventCode)
+size_t event::EventManager::deleteCallbacks(Type eventCode)
 {
     if ((int)eventCode < 0)
-        return false;
+        return 0;
     auto &callbacksVec = m_eventBinds[eventCode];
     if (callbacksVec.empty())
-        return false;
+        return 0;
     auto cit = callbacksVec.begin(), end = callbacksVec.end();
+    size_t cnt = 0;
     for (; cit != end; cit++)
     {
-        util::Callback *pCallback = *cit;
-        delete pCallback;
+        auto *pCallback = *cit;
+        if (pCallback)
+            delete pCallback;
         *cit = nullptr;
-        pCallback = nullptr;
+        cnt++;
     } //> for each callback
     callbacksVec.clear();
-    return true;
+    return cnt;
 } //> deleteCallbacks(...)
 //>---------------------------------------------------------------------------------------
 
-event::TimerEntryInfo *event::EventManager::addTimeout(util::Callback *pCallback,
-                                                       const int timeout, WrappedArgs &args)
+uint32_t event::EventManager::addTimeout(util::Callback *pCallback,
+                                         const int timeout, WrappedArgs &args)
 {
     if (!pCallback)
-        return nullptr;
+        return 0;
     TimerEntryInfo timer(TimerEntryInfo::autoid(), 1, timeout, pCallback);
-    timer.setArgs(std::move(args));
+    if (args.size() > 0)
+        timer.setArgs(std::move(args));
     m_timerEntries.emplace(std::move(timer));
-    return &m_timerEntries.back();
-} // addTimeoutCallback(...)
+    return m_timerEntries.back().getId();
+} //> addTimeout(...)
+//>---------------------------------------------------------------------------------------
+
+event::TimerEntryInfo *event::EventManager::getTimer(const uint32_t id)
+{
+    for (auto &it : m_timerEntries)
+        if (it.getId() == id)
+            return &it;
+    return nullptr;
+} //> getTimer(...)
+//>---------------------------------------------------------------------------------------
+
+event::TimerEntryInfo const *event::EventManager::getTimer(const uint32_t id) const
+{
+    for (const auto &it : m_timerEntries)
+        if (it.getId() == id)
+            return &it;
+    return nullptr;
+} //> getTimer(...)
 //>---------------------------------------------------------------------------------------
 
 bool event::EventManager::hasTimer(const uint32_t id)
@@ -385,6 +361,8 @@ bool event::EventManager::removeTimer(const uint32_t id)
 
 size_t event::EventManager::removeTimers(const std::vector<uint32_t> &ids)
 {
+    if (!ids.size())
+        return 0;
     size_t cnt = 0;
     for (auto &id : ids)
     {
@@ -406,111 +384,73 @@ size_t event::EventManager::removeTimers(const std::vector<uint32_t> &ids)
 }
 //>---------------------------------------------------------------------------------------
 
+size_t event::EventManager::removeInactiveTimers(void)
+{
+    std::vector<uint32_t> ids;
+    for (const auto &it : m_timerEntries)
+    {
+        if (it.isInactive())
+            ids.push_back(it.getId());
+    }
+    return removeTimers(ids);
+}
+//>---------------------------------------------------------------------------------------
+
 bool event::EventManager::removeTimer(const util::Callback *pCallback)
 {
+    for (const auto &it : m_timerEntries)
+    {
+        if (it.checkCallback(pCallback))
+        {
+            removeTimer(it.getId());
+            return true;
+        }
+    }
     return false;
 }
 //>---------------------------------------------------------------------------------------
 
-event::TimerEntryInfo *event::EventManager::addInterval(const int repeats,
-                                                        const int interval,
-                                                        util::Callback *pCallback,
-                                                        WrappedArgs &args)
+uint32_t event::EventManager::addInterval(const int repeats, const int interval,
+                                          util::Callback *pCallback, WrappedArgs &args)
 {
     if (!pCallback)
-        return nullptr;
+        return 0;
     TimerEntryInfo timer(TimerEntryInfo::autoid(), repeats, interval, pCallback);
-    timer.setArgs(std::move(args));
+    if (args.size() > 0)
+        timer.setArgs(std::move(args));
     m_timerEntries.emplace(std::move(timer));
-    return &m_timerEntries.back();
+    return m_timerEntries.back().getId();
 } //> addInteval(...)
 //>---------------------------------------------------------------------------------------
 
 void event::EventManager::executeEvents(void)
 {
-    /*
-    ////////////////////////////////////////////////////////////////////////////
-    // Phase 1: Timeouts
-    unsigned long int timeStamp = timesys::ticks();
-
+    //#-----------------------------------------------------------------------------------
+    //# Phase 1: Intervals & timeouts - universal
+    const auto timeStamp = timesys::ticks();
     // After timeout is executed it needs to be deleted from the timeouts pool - also the callback pointer must
-    // be freed with the argument list as they no longer needed
-    for (TimeoutCallbacksVecItor it = m_timeoutCallbacks.begin(); it != m_timeoutCallbacks.end(); it++)
+    // be freed with the argument list as they no longer needed - it will be done automatically in a separate self-owned timer
+    for (auto &timer : m_timerEntries)
     {
-        if (timeStamp - it->timeStamp < (unsigned long int)it->timeout)
-        {
-            continue; // skip!
-        }
-        if (it->callback)
-        {
-            (*it->callback)(it->argList);
-            delete it->callback;
-            it->callback = nullptr;
-        }
-        if (it->argList)
-        {
-            // delete it->argList;
-            pushToFreeSlot(it->argList);
-            it->argList = nullptr;
-        }
-        if (it->callback == nullptr)
-        {
-            m_timeoutCallbacks.erase(it);
-            it--;
-        }
-    } // for each timeout callback
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Phase 2: Cyclic callbacks
-    for (int cIdx = 0; cIdx < (int)m_cyclicCallbacks.size(); cIdx++)
-    {
-        CyclicCallback &cyclic = m_cyclicCallbacks[cIdx];
-        if (timeStamp - cyclic.timeStamp < (unsigned long int)cyclic.interval)
-        {
-            continue; // skip!
-        }
-        if (cyclic.callback && (cyclic.repeats || cyclic.repeats == -1))
-        {
-            (*cyclic.callback)(cyclic.argList);
-            cyclic.timeStamp = timeStamp;
-            if (cyclic.repeats != 0)
-                cyclic.repeats--;
-        }
-        if (cyclic.callback == nullptr)
-            cyclic.repeats = 0;
-
-        if (cyclic.repeats != 0)
-        {
-            continue;
-        }
-        if (cyclic.callback)
-        {
-            delete cyclic.callback;
-            cyclic.callback = nullptr;
-        }
-        if (cyclic.argList)
-        {
-            // delete cyclic.argList;
-            pushToFreeSlot(cyclic.argList);
-            cyclic.argList = nullptr;
-        }
-        int n = (int)m_cyclicCallbacks.size();
-        m_cyclicCallbacks[cIdx] = m_cyclicCallbacks[n - 1];
-        memset(&m_cyclicCallbacks[n - 1], 0, sizeof(CyclicCallback));
-        m_cyclicCallbacks.resize(n - 1);
-        cIdx--;
-    } // for each cyclic callback
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Phase 3: execution of thrown events (now including the argument list).
-    // Btw after calling the proper callback,
-    // queue entry with argument list must be erased
+        if (timer.getId() == m_cleanupIntervalId)
+            continue; // skip the cleanup timer so it does not invalidate the iterator
+        if (timer.isInactive())
+            continue; // skip inactive ones
+        const auto targetTs = timer.getTargetTs();
+        // trigger callback only if target TS is met
+        if (timeStamp >= targetTs)
+            timer.call();
+    } //# for each timer
+    auto pCleanupTimer = getTimer(m_cleanupIntervalId);
+    if (pCleanupTimer)
+        pCleanupTimer->call(); // know that is not takes parameters
+    //#-----------------------------------------------------------------------------------
+    //# Phase 2: execution of thrown events (now including the argument list).
     while (!m_eventsQueue.empty())
     {
-        ThrownEvent &event = m_eventsQueue.front();
-        executeEvent(event);
+        // this will also cleanup the allocated argument list that's associated with thrown event
+        executeEvent(m_eventsQueue.front());
         m_eventsQueue.pop();
-    } // for each event on queue
-    */
+    } //> for each event on queue
 } //> executeEvents(...)
 //>---------------------------------------------------------------------------------------

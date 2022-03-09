@@ -10,7 +10,6 @@ namespace event
     struct TimerHelper;
 
     using WrappedArgs = std::vector<::util::WrappedValue *>;
-    using WrappedArgsPtrVec = std::vector<WrappedArgs *>;
 
     struct TimerEntryInfo
     {
@@ -33,7 +32,7 @@ namespace event
     public:
         int timeout;
         int repeats;
-        int64_t startTs;
+        int64_t currentTs;
         bool triggered;
         WrappedArgs args;
 
@@ -41,9 +40,9 @@ namespace event
         std::unique_ptr<util::Callback> callback;
 
     public:
-        TimerEntryInfo() : type(INTERVAL), id(autoid()), timeout(0), repeats(0), startTs(timesys::ticks()), triggered(false), args(), callback() {}
+        TimerEntryInfo() : type(INTERVAL), id(autoid()), timeout(0), repeats(0), currentTs(timesys::ticks()), triggered(false), args(), callback() {}
         TimerEntryInfo(uint32_t _id, int _repeats, int _timeout, util::Callback *_pCallback)
-            : type(INTERVAL), id(!_id ? TimerEntryInfo::autoid() : _id), timeout(_timeout), repeats(_repeats), startTs(timesys::ticks()), triggered(false), args(), callback(_pCallback) {}
+            : type(INTERVAL), id(!_id ? TimerEntryInfo::autoid() : _id), timeout(_timeout), repeats(_repeats), currentTs(timesys::ticks()), triggered(false), args(), callback(_pCallback) {}
 
         ~TimerEntryInfo()
         {
@@ -51,7 +50,7 @@ namespace event
             id = 0;
             timeout = 0;
             repeats = 0;
-            startTs = 0;
+            currentTs = 0;
             triggered = false;
         }
 
@@ -64,40 +63,43 @@ namespace event
             type = other.type;
             timeout = other.timeout;
             repeats = other.repeats;
-            startTs = other.startTs;
+            currentTs = other.currentTs;
             triggered = other.triggered;
             other.id = 0;
             other.timeout = 0;
             other.repeats = 0;
-            other.startTs = 0LL;
+            other.currentTs = 0LL;
             other.triggered = false;
         }
 
         TimerEntryInfo &operator=(TimerEntryInfo &&other)
         {
+            util::reset_arguments(args); // cleanup previous value
             callback = std::move(other.callback);
             args = std::move(other.args);
             id = other.id;
             type = other.type;
             timeout = other.timeout;
             repeats = other.repeats;
-            startTs = other.startTs;
+            currentTs = other.currentTs;
             triggered = other.triggered;
             other.id = 0;
             other.timeout = 0;
             other.repeats = 0;
-            other.startTs = 0LL;
+            other.currentTs = 0LL;
             other.triggered = false;
         }
 
         TimerEntryInfo &setArgs(const WrappedArgs &_args)
         {
+            util::reset_arguments(this->args); // cleanup previous value
             this->args = _args;
             return *this;
         }
 
         TimerEntryInfo &setArgs(WrappedArgs &&_args)
         {
+            util::reset_arguments(this->args); // cleanup previous value
             this->args = std::move(_args);
             return *this;
         }
@@ -112,19 +114,29 @@ namespace event
             auto status = (*callback)(args);
             repeats = repeats > 0 ? repeats - 1 : repeats; // remove only if more than zero
             triggered = true;
-            startTs = timesys::ticks();
+            currentTs = timesys::ticks();
             return status;
         }
 
-        inline constexpr bool isInactive(void) const noexcept { return (triggered && type == TIMEOUT) || repeats == 0; }
+        inline int64_t getTargetTs() const { return currentTs + timeout; }
+
+        inline bool checkCallback(const util::Callback *pCallback) const { return callback.get() == pCallback; }
+
+        inline void deactivate(void)
+        {
+            repeats = 0;
+            triggered = true;
+        }
+
+        inline constexpr bool isInactive(void) const noexcept { return (triggered && type == TIMEOUT) || repeats == 0 || !callback; }
 
         inline constexpr bool isInterval(void) const noexcept { return type == INTERVAL; }
 
         inline constexpr bool isTimeout(void) const noexcept { return type == TIMEOUT; }
 
-        inline Type getType(void) const { return type; }
+        inline constexpr Type getType(void) const { return type; }
 
-        inline uint32_t getId(void) const { return id; }
+        inline constexpr uint32_t getId(void) const { return id; }
 
         static uint32_t autoid() { return ++s_autoid; }
     }; //# struct TimerEntryInfo
@@ -136,7 +148,7 @@ namespace event
         TimerHelper(const TimerHelper &other) = delete;
 
         template <TimerEntryInfo::Type TimerType, typename ReturnType, typename... Args>
-        static std::enable_if<TimerType == TimerEntryInfo::INTERVAL, TimerEntryInfo>
+        static typename std::enable_if<TimerType == TimerEntryInfo::INTERVAL, TimerEntryInfo>::type
         function(int interval, int repeats, ReturnType (*function)(Args...), const std::initializer_list<std::string> &argNames = {})
         {
             if (repeats == 0 || repeats < -1)
@@ -145,26 +157,26 @@ namespace event
         }
 
         template <TimerEntryInfo::Type TimerType, typename ReturnType, typename... Args>
-        static std::enable_if<TimerType == TimerEntryInfo::TIMEOUT, TimerEntryInfo>
+        static typename std::enable_if<TimerType == TimerEntryInfo::TIMEOUT, TimerEntryInfo>::type
         function(int timeout, ReturnType (*function)(Args...), const std::initializer_list<std::string> &argNames = {})
         {
             return TimerEntryInfo(TimerEntryInfo::autoid(), 1, timeout, util::FunctionCallback::create<ReturnType, Args...>(function, argNames)); // move
         }
 
         template <TimerEntryInfo::Type TimerType, typename UserClass, typename ReturnType, typename... Args>
-        static std::enable_if<TimerType == TimerEntryInfo::INTERVAL, TimerEntryInfo>
+        static typename std::enable_if<TimerType == TimerEntryInfo::INTERVAL, TimerEntryInfo>::type
         method(int interval, int repeats, UserClass *pObject, ReturnType (UserClass::*methodMember)(Args...), const std::initializer_list<std::string> &argNames = {})
         {
             if (repeats == 0 || repeats < -1)
                 repeats = -1;
-            return TimerEntryInfo(TimerEntryInfo::autoid(), repeats, interval, util::MethodCallback::create<UserClass, ReturnType, Args...>(pObject, methodMember, argNames)); // move
+            return TimerEntryInfo(TimerEntryInfo::autoid(), repeats, interval, util::MethodCallback<UserClass>::create<ReturnType, Args...>(methodMember, pObject, argNames)); // move
         }
 
         template <TimerEntryInfo::Type TimerType, typename UserClass, typename ReturnType, typename... Args>
-        static std::enable_if<TimerType == TimerEntryInfo::TIMEOUT, TimerEntryInfo>
+        static typename std::enable_if<TimerType == TimerEntryInfo::TIMEOUT, TimerEntryInfo>::type
         method(int timeout, UserClass *pObject, ReturnType (UserClass::*methodMember)(Args...), const std::initializer_list<std::string> &argNames = {})
         {
-            return TimerEntryInfo(TimerEntryInfo::autoid(), 1, timeout, util::MethodCallback::create<UserClass, ReturnType, Args...>(pObject, methodMember, argNames)); // move
+            return TimerEntryInfo(TimerEntryInfo::autoid(), 1, timeout, util::MethodCallback<UserClass>::create<ReturnType, Args...>(methodMember, pObject, argNames)); // move
         }
 
     }; //# struct TimerHelper

@@ -154,7 +154,7 @@ namespace util
             return !!BindingHelper::callWrapped(m_pObject, m_binding.get(), args);
         }
 
-        template <typename UserClass, typename ReturnType, typename... Args>
+        template <typename ReturnType, typename... Args>
         static self_type *create(ReturnType (UserClass::*methodMember)(Args...),
                                  UserClass *pObject = nullptr,
                                  const std::initializer_list<std::string> &argNames = {})

@@ -34,7 +34,12 @@ namespace resource
         std::remove_pointer_t<TUserType> *dereference(uint64_t handle)
         {
             using data_type = std::remove_pointer_t<TUserType>;
-            static_assert(std::is_void_v<data_type> || (!std::is_void_v<data_type> && std::is_base_of_v<resource::ManagedObjectBase, data_type>), "TUserType template parameter type needs to be derived from ManagedObjectBase");
+            static_assert(std::is_void_v<data_type> ||
+                              (!std::is_void_v<data_type> &&
+                               (std::is_base_of_v<resource::ManagedObjectBase, data_type> ||
+                                std::is_base_of_v<util::HandledObject, data_type>)),
+                          "TUserType template parameter type needs to be derived from ManagedObjectBase or HandledObject");
+            // try to find data manager based on
             auto manager = getDataManager(util::HandleHelper::unpack(handle).tag);
             return !manager ? nullptr : manager->dereference<TUserType>(handle);
         }
@@ -43,7 +48,12 @@ namespace resource
         std::remove_pointer_t<TUserType> *dereference(const std::string &nameTag)
         {
             using data_type = std::remove_pointer_t<TUserType>;
-            static_assert(std::is_void_v<data_type> || (!std::is_void_v<data_type> && std::is_base_of_v<resource::ManagedObjectBase, data_type>), "TUserType template parameter type needs to be derived from ManagedObjectBase");
+            static_assert(std::is_void_v<data_type> ||
+                              (!std::is_void_v<data_type> &&
+                               (std::is_base_of_v<resource::ManagedObjectBase, data_type> ||
+                                std::is_base_of_v<util::HandledObject, data_type>)),
+                          "TUserType template parameter type needs to be derived from ManagedObjectBase or HandledObject");
+            // no other way - need to go over all data managers and try derefencing on each of them
             for (auto &it : m_dataManagers)
             {
                 // cannot retrieve
@@ -58,7 +68,11 @@ namespace resource
         std::remove_pointer_t<TUserType> *dereference(util::NamedHandle &nameTag)
         {
             using data_type = std::remove_pointer_t<TUserType>;
-            static_assert(std::is_void_v<data_type> || (!std::is_void_v<data_type> && std::is_base_of_v<resource::ManagedObjectBase, data_type>), "TUserType template parameter type needs to be derived from ManagedObjectBase");
+            static_assert(std::is_void_v<data_type> ||
+                              (!std::is_void_v<data_type> &&
+                               (std::is_base_of_v<resource::ManagedObjectBase, data_type> ||
+                                std::is_base_of_v<util::HandledObject, data_type>)),
+                          "TUserType template parameter type needs to be derived from ManagedObjectBase or HandledObject");
             auto manager = getDataManager(nameTag.getTag());
             return !manager ? nullptr : manager->dereference<data_type>(nameTag);
         }

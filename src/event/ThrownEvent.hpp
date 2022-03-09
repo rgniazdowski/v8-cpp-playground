@@ -14,34 +14,33 @@ namespace event
     struct ThrownEvent
     {
         Type eventCode;
-        util::WrappedValue::Args *args;
+        util::WrappedValue::Args args;
 
-        ThrownEvent(Type _eventCode = event::Type::Invalid,
-                    util::WrappedValue::Args *_args = nullptr) : eventCode(_eventCode),
-                                                                 args(_args) {}
+        ThrownEvent() : eventCode(Type::Invalid), args() {}
+
+        ThrownEvent(Type _eventCode, util::WrappedValue::Args &_args) : eventCode(_eventCode),
+                                                                        args(std::move(_args)) {}
 
         ThrownEvent(const ThrownEvent &other) = delete;
         ThrownEvent &operator=(const ThrownEvent &other) = delete;
 
         ThrownEvent(ThrownEvent &&other) : eventCode(other.eventCode),
-                                           args(other.args)
+                                           args(std::move(other.args))
         {
-            other.eventCode = event::Type::Invalid;
-            other.args = nullptr;
+            other.eventCode = Type::Invalid;
         }
 
         ThrownEvent &operator=(ThrownEvent &&other)
         {
             eventCode = other.eventCode;
-            args = other.args;
-            other.eventCode = event::Type::Invalid;
-            other.args = nullptr;
+            args = std::move(other.args);
+            other.eventCode = Type::Invalid;
         }
 
         ~ThrownEvent()
         {
-            eventCode = event::Type::Invalid;
-            args = nullptr;
+            eventCode = Type::Invalid;
+            util::reset_arguments(args);
         }
     }; //# struct ThrownEvent
 

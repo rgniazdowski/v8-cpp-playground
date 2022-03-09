@@ -23,7 +23,7 @@ namespace event
         /// Maximum number of thrown events
         static const unsigned int MAX_THROWN_EVENTS = 256;
         /// This is initial allocation for pointer vectors (initial capacity)
-        static const unsigned int INITIAL_PTR_VEC_SIZE = 32;
+        static const unsigned int INITIAL_PTR_VEC_SIZE = 128;
 
     public:
         /**
@@ -49,12 +49,11 @@ namespace event
         //#-------------------------------------------------------------------------------
 
         /**
-         * This adds event to the waiting queue, the *list object needs to be allocated before,
-         * after event callback execution argument list must be freed
+         * This adds event to the waiting queue and moves the input arguments
          * @param eventCode
          * @param list
          */
-        ThrownEvent &throwEvent(Type eventCode, WrappedArgs *args = nullptr);
+        ThrownEvent &throwEvent(Type eventCode, WrappedArgs &args);
 
         //#-------------------------------------------------------------------------------
 
@@ -88,8 +87,8 @@ namespace event
         //#-------------------------------------------------------------------------------
 
         unsigned int executeEvent(Type eventCode);
-        unsigned int executeEvent(const ThrownEvent &thrownEvent);
-        unsigned int executeEvent(Type eventCode, WrappedArgs *pArgs);
+        unsigned int executeEvent(ThrownEvent &thrownEvent);
+        unsigned int executeEvent(Type eventCode, WrappedArgs &args);
 
         //#-------------------------------------------------------------------------------
 
@@ -113,28 +112,33 @@ namespace event
          * @param eventCode
          * @return
          */
-        bool removeCallbacks(Type eventCode);
+        CallbacksVec removeCallbacks(Type eventCode);
 
         bool deleteCallback(Type eventCode, util::Callback *&pCallback);
-        bool deleteCallbacks(Type eventCode);
+        size_t deleteCallbacks(Type eventCode);
 
         //#-------------------------------------------------------------------------------
 
-        TimerEntryInfo *addTimeout(util::Callback *pCallback, const int timeout, WrappedArgs &args);
+        uint32_t addTimeout(util::Callback *pCallback, const int timeout, WrappedArgs &args);
 
         template <typename ReturnType, typename... Args>
-        TimerEntryInfo *addTimeout(const int timeout, ReturnType (*function)(Args...),
-                                   WrappedArgs &args, const std::initializer_list<std::string> &argNames = {});
+        uint32_t addTimeout(const int timeout, ReturnType (*function)(Args...),
+                            WrappedArgs &args = WrappedArgs(),
+                            const std::initializer_list<std::string> &argNames = {});
 
         template <typename UserClass, typename ReturnType, typename... Args>
-        TimerEntryInfo *addTimeout(const int timeout, UserClass *pObject,
-                                   ReturnType (UserClass::*methodMember)(Args...),
-                                   WrappedArgs &args,
-                                   const std::initializer_list<std::string> &argNames = {});
+        uint32_t addTimeout(const int timeout, UserClass *pObject,
+                            ReturnType (UserClass::*methodMember)(Args...),
+                            WrappedArgs &args = WrappedArgs(),
+                            const std::initializer_list<std::string> &argNames = {});
+
+        TimerEntryInfo *getTimer(const uint32_t id);
+        TimerEntryInfo const *getTimer(const uint32_t id) const;
 
         bool hasTimer(const uint32_t id);
         bool removeTimer(const uint32_t id);
         size_t removeTimers(const std::vector<uint32_t> &ids);
+        size_t removeInactiveTimers(void);
         bool removeTimer(const util::Callback *pCallback);
 
         inline bool removeTimeout(const uint32_t id) { return removeTimer(id); };
@@ -142,18 +146,19 @@ namespace event
 
         //#-------------------------------------------------------------------------------
 
-        TimerEntryInfo *addInterval(const int interval, const int repeats,
-                                    util::Callback *pCallback, WrappedArgs &args);
+        uint32_t addInterval(const int interval, const int repeats,
+                             util::Callback *pCallback, WrappedArgs &args);
 
         template <typename ReturnType, typename... Args>
-        TimerEntryInfo *addInterval(const int interval, const int repeats, ReturnType (*function)(Args...),
-                                    WrappedArgs &args, const std::initializer_list<std::string> &argNames = {});
+        uint32_t addInterval(const int interval, const int repeats, ReturnType (*function)(Args...),
+                             WrappedArgs &args = WrappedArgs(),
+                             const std::initializer_list<std::string> &argNames = {});
 
         template <typename UserClass, typename ReturnType, typename... Args>
-        TimerEntryInfo *addInterval(const int interval, const int repeats, UserClass *pObject,
-                                    ReturnType (UserClass::*methodMember)(Args...),
-                                    WrappedArgs &args,
-                                    const std::initializer_list<std::string> &argNames = {});
+        uint32_t addInterval(const int interval, const int repeats, UserClass *pObject,
+                             ReturnType (UserClass::*methodMember)(Args...),
+                             WrappedArgs &args = WrappedArgs(),
+                             const std::initializer_list<std::string> &argNames = {});
 
         inline bool removeInterval(const uint32_t id) { return removeTimer(id); };
         inline bool removeInterval(const util::Callback *pCallback) { return removeTimer(pCallback); }
@@ -169,7 +174,7 @@ namespace event
 
     private:
         void pushToFreeSlot(EventBase *pEventStruct);
-        void pushToFreeSlot(WrappedArgs *pArgs);
+        void resetArguments(WrappedArgs &args);
 
     private:
         /// Binding for all global events
@@ -179,13 +184,11 @@ namespace event
         /// Pool with timers - these are one shot timeouts and intervals
         TimerEntries m_timerEntries;
         ///
+        uint32_t m_cleanupIntervalId;
+        ///
         EventsPtrVec m_eventStructs;
         ///
         EventsPtrVec m_eventStructsFreeSlots;
-        ///
-        WrappedArgsPtrVec m_argsLists;
-        ///
-        WrappedArgsPtrVec m_argsListsFreeSlots;
     }; //# class EventManager
 
     template <typename UserClass, typename ReturnType, typename... Args>
@@ -342,42 +345,42 @@ namespace event
     //>-----------------------------------------------------------------------------------
 
     template <typename ReturnType, typename... Args>
-    TimerEntryInfo *EventManager::addTimeout(const int timeout, ReturnType (*function)(Args...),
-                                             WrappedArgs &args, const std::initializer_list<std::string> &argNames)
+    uint32_t EventManager::addTimeout(const int timeout, ReturnType (*function)(Args...),
+                                      WrappedArgs &args, const std::initializer_list<std::string> &argNames)
     {
-        m_timerEntries.emplace(TimerHelper::function<TimerEntryInfo::TIMEOUT, ReturnType, Args..>(timeout, function, argNames).setArgs(std::move(args)));
-        return &m_timerEntries.back();
+        m_timerEntries.emplace(std::move(TimerHelper::function<TimerEntryInfo::TIMEOUT, ReturnType, Args...>(timeout, function, argNames).setArgs(std::move(args))));
+        return m_timerEntries.back().getId();
     }
     //>-----------------------------------------------------------------------------------
 
     template <typename UserClass, typename ReturnType, typename... Args>
-    TimerEntryInfo *EventManager::addTimeout(const int timeout, UserClass *pObject,
-                                             ReturnType (UserClass::*methodMember)(Args...),
-                                             WrappedArgs &args,
-                                             const std::initializer_list<std::string> &argNames)
+    uint32_t EventManager::addTimeout(const int timeout, UserClass *pObject,
+                                      ReturnType (UserClass::*methodMember)(Args...),
+                                      WrappedArgs &args,
+                                      const std::initializer_list<std::string> &argNames)
     {
-        m_timerEntries.emplace(TimerHelper::method<TimerEntryInfo::TIMEOUT, UserClass, ReturnType, Args..>(timeout, pObject, methodMember, argNames).setArgs(std::move(args)));
-        return &m_timerEntries.back();
+        m_timerEntries.emplace(std::move(TimerHelper::method<TimerEntryInfo::TIMEOUT, UserClass, ReturnType, Args...>(timeout, pObject, methodMember, argNames).setArgs(std::move(args))));
+        return m_timerEntries.back().getId();
     }
     //>-----------------------------------------------------------------------------------
 
     template <typename ReturnType, typename... Args>
-    TimerEntryInfo *EventManager::addInterval(const int interval, const int repeats, ReturnType (*function)(Args...),
-                                              WrappedArgs &args, const std::initializer_list<std::string> &argNames)
+    uint32_t EventManager::addInterval(const int interval, const int repeats, ReturnType (*function)(Args...),
+                                       WrappedArgs &args, const std::initializer_list<std::string> &argNames)
     {
-        m_timerEntries.emplace(TimerHelper::function<TimerEntryInfo::INTERVAL, ReturnType, Args..>(interval, repeats, function, argNames).setArgs(std::move(args)));
-        return &m_timerEntries.back();
+        m_timerEntries.emplace(std::move(TimerHelper::function<TimerEntryInfo::INTERVAL, ReturnType, Args...>(interval, repeats, function, argNames).setArgs(std::move(args))));
+        return m_timerEntries.back().getId();
     }
     //>-----------------------------------------------------------------------------------
 
     template <typename UserClass, typename ReturnType, typename... Args>
-    TimerEntryInfo *EventManager::addInterval(const int interval, const int repeats, UserClass *pObject,
-                                              ReturnType (UserClass::*methodMember)(Args...),
-                                              WrappedArgs &args,
-                                              const std::initializer_list<std::string> &argNames)
+    uint32_t EventManager::addInterval(const int interval, const int repeats, UserClass *pObject,
+                                       ReturnType (UserClass::*methodMember)(Args...),
+                                       WrappedArgs &args,
+                                       const std::initializer_list<std::string> &argNames)
     {
-        m_timerEntries.emplace(TimerHelper::method<TimerEntryInfo::INTERVAL, UserClass, ReturnType, Args..>(interval, repeats, pObject, methodMember, argNames).setArgs(std::move(args)));
-        return &m_timerEntries.back();
+        m_timerEntries.emplace(std::move(TimerHelper::method<TimerEntryInfo::INTERVAL, UserClass, ReturnType, Args...>(interval, repeats, pObject, methodMember, argNames).setArgs(std::move(args))));
+        return m_timerEntries.back().getId();
     }
     //>-----------------------------------------------------------------------------------
 
