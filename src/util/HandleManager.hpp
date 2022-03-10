@@ -13,7 +13,8 @@ namespace util
     template <typename THandleType>
     class HandleManager
     {
-        static_assert(std::is_base_of<HandleBase, THandleType>::value, "THandleType template parameter type needs to be derived from HandleBase");
+        static_assert(std::is_base_of<HandleBase, THandleType>::value,
+                      "THandleType template parameter type needs to be derived from HandleBase");
 
     public:
         using handle_type = THandleType;

@@ -2,6 +2,7 @@
 #define FG_INC_EVENT_DEFINITIONS
 
 #include <event/KeyVirtualCodes.hpp>
+#include <util/Handle.hpp>
 
 //
 // This file will contain all basic events occurring in the game engine
@@ -148,10 +149,17 @@ namespace event
         LastStandardEventCode = Reserved3
     };
 
-    struct EventBase
+    struct EventBase : public util::ObjectWithIdentifier
     {
+    private:
+        inline static uint64_t s_autoid = 0;
+
+    public:
         Type eventType;
-        unsigned long int timeStamp;
+        int64_t timeStamp;
+        uint64_t identifier;
+        inline uint64_t getIdentifier(void) const override { return identifier; }
+        inline static uint64_t autoid(void) { return ++s_autoid; }
     };
 
     struct EventControllerDevice : EventBase
@@ -502,6 +510,7 @@ namespace event
             {
                 Type eventType;
                 int64_t timeStamp;
+                uint64_t identifier;
             };
             EventTouch touch;
             EventMouse mouse;

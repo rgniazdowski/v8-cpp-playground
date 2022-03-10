@@ -9,7 +9,7 @@
 
 namespace resource
 {
-    class ManagedObjectBase : public util::HandledObject
+    class ManagedObjectBase : public util::ObjectWithHandle
     {
     public:
         using self_type = ManagedObjectBase;
@@ -51,8 +51,6 @@ namespace resource
 
         inline util::NamedHandle const &getName(void) const { return m_nameTag; }
 
-        virtual util::HandleBase const &getHandleBase(void) const = 0;
-
         inline void setManaged(bool toggle = true) { m_isManaged = toggle; }
 
     protected:
@@ -73,7 +71,8 @@ namespace resource
 
         using CallbacksVec = std::vector<CallbackData>;
         CallbacksVec m_onDestructorCallbacks;
-    }; //# class ManagedObject
+    }; //# class ManagedObjectBase
+    //#-----------------------------------------------------------------------------------
 
     template <typename THandleType>
     class DataManagerBase;
@@ -117,6 +116,7 @@ namespace resource
     public:
         inline handle_type const &getHandle(void) const { return m_handle; }
         inline util::HandleBase const &getHandleBase(void) const override { return m_handle; }
+        inline uint64_t getIdentifier(void) const override { return m_handle.getHandle(); }
 
         // inline fg::base::CManager *getManager(void) const { return m_pManager; }
         // inline void setManager(fg::base::CManager *pManager) { m_pManager = pManager; }

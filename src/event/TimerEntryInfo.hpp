@@ -138,7 +138,7 @@ namespace event
 
         inline constexpr uint32_t getId(void) const { return id; }
 
-        static uint32_t autoid() { return ++s_autoid; }
+        inline static uint32_t autoid(void) { return ++s_autoid; }
     }; //# struct TimerEntryInfo
     //#-----------------------------------------------------------------------------------
 

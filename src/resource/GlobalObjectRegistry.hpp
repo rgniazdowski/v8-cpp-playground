@@ -37,8 +37,8 @@ namespace resource
             static_assert(std::is_void_v<data_type> ||
                               (!std::is_void_v<data_type> &&
                                (std::is_base_of_v<resource::ManagedObjectBase, data_type> ||
-                                std::is_base_of_v<util::HandledObject, data_type>)),
-                          "TUserType template parameter type needs to be derived from ManagedObjectBase or HandledObject");
+                                std::is_base_of_v<util::ObjectWithIdentifier, data_type>)),
+                          "TUserType template parameter type needs to be derived from ManagedObjectBase or ObjectWithIdentifier");
             // try to find data manager based on
             auto manager = getDataManager(util::HandleHelper::unpack(handle).tag);
             return !manager ? nullptr : manager->dereference<TUserType>(handle);
@@ -51,8 +51,8 @@ namespace resource
             static_assert(std::is_void_v<data_type> ||
                               (!std::is_void_v<data_type> &&
                                (std::is_base_of_v<resource::ManagedObjectBase, data_type> ||
-                                std::is_base_of_v<util::HandledObject, data_type>)),
-                          "TUserType template parameter type needs to be derived from ManagedObjectBase or HandledObject");
+                                std::is_base_of_v<util::ObjectWithIdentifier, data_type>)),
+                          "TUserType template parameter type needs to be derived from ManagedObjectBase or ObjectWithIdentifier");
             // no other way - need to go over all data managers and try derefencing on each of them
             for (auto &it : m_dataManagers)
             {
@@ -71,8 +71,8 @@ namespace resource
             static_assert(std::is_void_v<data_type> ||
                               (!std::is_void_v<data_type> &&
                                (std::is_base_of_v<resource::ManagedObjectBase, data_type> ||
-                                std::is_base_of_v<util::HandledObject, data_type>)),
-                          "TUserType template parameter type needs to be derived from ManagedObjectBase or HandledObject");
+                                std::is_base_of_v<util::ObjectWithIdentifier, data_type>)),
+                          "TUserType template parameter type needs to be derived from ManagedObjectBase or ObjectWithIdentifier");
             auto manager = getDataManager(nameTag.getTag());
             return !manager ? nullptr : manager->dereference<data_type>(nameTag);
         }
@@ -120,8 +120,8 @@ namespace resource
         {
             if (has<TUserType>(data))
                 return false;
-            auto &handle = data->getHandleBase();
-            m_registry.emplace(handle.getHandle(), Wrapped{util::HandleHelper::unpack(handle), handle.getHandle(), data});
+            const auto identifier = data->getIdentifier();
+            m_registry.emplace(identifier, Wrapped{util::HandleHelper::unpack(identifier), identifier, data});
             return true;
         }
 
@@ -129,34 +129,34 @@ namespace resource
         std::remove_pointer_t<TUserType> *find(const util::HandleBase &handle) { return find<TUserType>(handle.getHandle()); }
 
         template <typename TUserType>
-        std::remove_pointer_t<TUserType> *find(uint64_t handle)
+        std::remove_pointer_t<TUserType> *find(uint64_t identifier)
         {
             using data_type = std::remove_pointer_t<TUserType>;
             data_type *found = nullptr;
-            auto it = m_registry.find(handle);
+            auto it = m_registry.find(identifier);
             if (it != m_registry.end())
                 found = static_cast<data_type *>(it->second.pointer);
             if (!found)
-                found = this->dereference<data_type>(handle);
+                found = this->dereference<data_type>(identifier);
             return found;
         }
 
         template <typename TUserType>
         bool has(TUserType *data)
         {
-            auto handle = data->getHandleBase().getHandle();
-            auto inRegistry = m_registry.find(handle) != m_registry.end();
+            const auto identifier = data->getIdentifier();
+            auto inRegistry = m_registry.find(identifier) != m_registry.end();
             if (inRegistry)
                 return true;
-            return this->dereference<void>(handle) != nullptr;
+            return this->dereference<void>(identifier) != nullptr;
         }
 
-        bool has(uint64_t handle)
+        bool has(uint64_t identifier)
         {
-            auto inRegistry = m_registry.find(handle) != m_registry.end();
+            auto inRegistry = m_registry.find(identifier) != m_registry.end();
             if (inRegistry)
                 return true;
-            return this->dereference<void>(handle) != nullptr;
+            return this->dereference<void>(identifier) != nullptr;
         }
 
         bool has(const util::HandleBase &handle)
@@ -192,12 +192,12 @@ namespace util
     struct convert
     {
         using user_type = std::remove_pointer_t<TUserType>;
-        static user_type *convertToPointer(void *data, uint64_t handle)
+        static user_type *convertToPointer(void *data, uint64_t identifier)
         {
             if (data != nullptr)
                 return static_cast<user_type *>(data);
             auto registry = resource::GlobalObjectRegistry::instance();
-            return registry->find<user_type>(handle);
+            return registry->find<user_type>(identifier);
         }
     };
 } //> namespace util

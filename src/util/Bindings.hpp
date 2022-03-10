@@ -316,13 +316,13 @@ namespace util
         template <typename T>
         static WrappedValue *external(T **value, uint64_t id)
         {
-            return new WrappedValue(typeid(T *).name(), !value ? nullptr : *value, !value ? id : (*value)->getHandleBase().getHandle());
+            return new WrappedValue(typeid(T *).name(), !value ? nullptr : *value, !value ? id : (*value)->getIdentifier());
         }
 
         template <typename T>
         static WrappedValue externalInPlace(T **value, uint64_t id)
         {
-            return WrappedValue(typeid(T *).name(), !value ? nullptr : *value, !value ? id : (*value)->getHandleBase().getHandle());
+            return WrappedValue(typeid(T *).name(), !value ? nullptr : *value, !value ? id : (*value)->getIdentifier());
         }
 
         //>-------------------------------------------------------------------------------
@@ -544,7 +544,7 @@ namespace util
             this->wrappedFunction = [function](const WrappedValue::Args &args)
             {
                 auto value = unpack_caller(function, args);
-                return WrappedValue::externalInPlace(&value, value->getHandleBase().getHandle());
+                return WrappedValue::externalInPlace(&value, value->getIdentifier());
             };
         }
 
@@ -659,7 +659,7 @@ namespace util
             this->wrappedMethod = [methodMember](void *pObject, const WrappedValue::Args &args)
             {
                 auto value = unpack_caller(static_cast<UserClass *>(pObject), methodMember, args);
-                return WrappedValue::externalInPlace(&value, value->getHandleBase().getHandle());
+                return WrappedValue::externalInPlace(&value, value->getIdentifier());
             };
         }
 
@@ -726,7 +726,7 @@ namespace util
             this->wrappedMethod = [function](void *pObject, const WrappedValue::Args &args)
             {
                 auto value = unpack_caller(function, args);
-                return WrappedValue::externalInPlace(&value, value->getHandleBase().getHandle());
+                return WrappedValue::externalInPlace(&value, value->getIdentifier());
             };
         }
 
@@ -827,7 +827,7 @@ namespace util
             this->getterWrapped = [_getter](void *pObject)
             {
                 auto value = unpack_caller(static_cast<UserClass *>(pObject), _getter, WrappedValue::Args(0));
-                return WrappedValue::externalInPlace(&value, value->getHandleBase().getHandle());
+                return WrappedValue::externalInPlace(&value, value->getIdentifier());
             };
             if (_setter != nullptr)
             {
@@ -914,7 +914,7 @@ namespace util
             this->getterWrapped = [pThis](void *pObject)
             {
                 auto value = pThis->get(static_cast<UserClass *>(pObject));
-                return WrappedValue::externalInPlace(&value, value->getHandleBase().getHandle());
+                return WrappedValue::externalInPlace(&value, value->getIdentifier());
             };
 
             this->setterWrapped = [pThis](void *pObject, const WrappedValue::Args &args)

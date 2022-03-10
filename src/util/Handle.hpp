@@ -142,12 +142,15 @@ namespace util
         static const char *getTagName(void) { return tag_type::name(); }
     }; //# class Handle<TagType>
 
-    class HandledObject
+    class ObjectWithIdentifier {
+        public:
+        virtual uint64_t getIdentifier(void) const = 0;
+    }; //> class ObjectWithIdentifier
+    class ObjectWithHandle : public ObjectWithIdentifier
     {
     public:
-        virtual ~HandledObject() {}
         virtual util::HandleBase const &getHandleBase(void) const = 0;
-    }; //> class HandledObject
+    }; //> class ObjectWithHandle
 } //> namespace util
 
 template <typename TagType>
