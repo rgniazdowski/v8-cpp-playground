@@ -1,15 +1,5 @@
-/*******************************************************************************
- * Copyright (C) Radoslaw Gniazdowski (flexigame.com)
- * All rights reserved.
- *
- * This file is part of FlexiGame: Flexible Game Engine.
- *
- * FlexiGame source code is distributed under 3-clause BSD License.
- * For full license text please check LICENSE(.txt) file.
- ******************************************************************************/
-
 #include <BuildConfig.hpp>
-#include <util/timesys.hpp>
+#include <util/Timesys.hpp>
 
 #if defined(FG_USING_PLATFORM_WINDOWS)
 #include <WindowsStandard.hpp>

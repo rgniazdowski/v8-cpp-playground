@@ -3,7 +3,7 @@
 #define FG_INC_TIMER_ENTRY_INFO
 
 #include <event/EventHelper.hpp>
-#include <util/timesys.hpp>
+#include <util/Timesys.hpp>
 
 namespace event
 {
@@ -149,34 +149,41 @@ namespace event
 
         template <TimerEntryInfo::Type TimerType, typename ReturnType, typename... Args>
         static typename std::enable_if<TimerType == TimerEntryInfo::INTERVAL, TimerEntryInfo>::type
-        function(int interval, int repeats, ReturnType (*function)(Args...), const std::initializer_list<std::string> &argNames = {})
+        function(int interval, ReturnType (*function)(Args...), int repeats = -1,
+                 const std::initializer_list<std::string> &argNames = {})
         {
             if (repeats == 0 || repeats < -1)
                 repeats = -1;
-            return TimerEntryInfo(TimerEntryInfo::autoid(), repeats, timeout, util::FunctionCallback::create<ReturnType, Args...>(function, argNames)); // move
+            return TimerEntryInfo(TimerEntryInfo::autoid(), repeats, interval,
+                                  util::FunctionCallback::create<ReturnType, Args...>(function, argNames)); // move
         }
 
         template <TimerEntryInfo::Type TimerType, typename ReturnType, typename... Args>
         static typename std::enable_if<TimerType == TimerEntryInfo::TIMEOUT, TimerEntryInfo>::type
         function(int timeout, ReturnType (*function)(Args...), const std::initializer_list<std::string> &argNames = {})
         {
-            return TimerEntryInfo(TimerEntryInfo::autoid(), 1, timeout, util::FunctionCallback::create<ReturnType, Args...>(function, argNames)); // move
+            return TimerEntryInfo(TimerEntryInfo::autoid(), 1, timeout,
+                                  util::FunctionCallback::create<ReturnType, Args...>(function, argNames)); // move
         }
 
         template <TimerEntryInfo::Type TimerType, typename UserClass, typename ReturnType, typename... Args>
         static typename std::enable_if<TimerType == TimerEntryInfo::INTERVAL, TimerEntryInfo>::type
-        method(int interval, int repeats, UserClass *pObject, ReturnType (UserClass::*methodMember)(Args...), const std::initializer_list<std::string> &argNames = {})
+        method(int interval, UserClass *pObject, ReturnType (UserClass::*methodMember)(Args...),
+               int repeats = -1, const std::initializer_list<std::string> &argNames = {})
         {
             if (repeats == 0 || repeats < -1)
                 repeats = -1;
-            return TimerEntryInfo(TimerEntryInfo::autoid(), repeats, interval, util::MethodCallback<UserClass>::create<ReturnType, Args...>(methodMember, pObject, argNames)); // move
+            return TimerEntryInfo(TimerEntryInfo::autoid(), repeats, interval,
+                                  util::MethodCallback<UserClass>::create<ReturnType, Args...>(methodMember, pObject, argNames)); // move
         }
 
         template <TimerEntryInfo::Type TimerType, typename UserClass, typename ReturnType, typename... Args>
         static typename std::enable_if<TimerType == TimerEntryInfo::TIMEOUT, TimerEntryInfo>::type
-        method(int timeout, UserClass *pObject, ReturnType (UserClass::*methodMember)(Args...), const std::initializer_list<std::string> &argNames = {})
+        method(int timeout, UserClass *pObject, ReturnType (UserClass::*methodMember)(Args...),
+               const std::initializer_list<std::string> &argNames = {})
         {
-            return TimerEntryInfo(TimerEntryInfo::autoid(), 1, timeout, util::MethodCallback<UserClass>::create<ReturnType, Args...>(methodMember, pObject, argNames)); // move
+            return TimerEntryInfo(TimerEntryInfo::autoid(), 1, timeout,
+                                  util::MethodCallback<UserClass>::create<ReturnType, Args...>(methodMember, pObject, argNames)); // move
         }
 
     }; //# struct TimerHelper

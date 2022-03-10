@@ -135,7 +135,8 @@ namespace event
         TimerEntryInfo *getTimer(const uint32_t id);
         TimerEntryInfo const *getTimer(const uint32_t id) const;
 
-        bool hasTimer(const uint32_t id);
+        inline bool hasTimers(void) const { return !m_timerEntries.empty(); }
+        bool hasTimer(const uint32_t id) const;
         bool removeTimer(const uint32_t id);
         size_t removeTimers(const std::vector<uint32_t> &ids);
         size_t removeInactiveTimers(void);
@@ -146,18 +147,18 @@ namespace event
 
         //#-------------------------------------------------------------------------------
 
-        uint32_t addInterval(const int interval, const int repeats,
-                             util::Callback *pCallback, WrappedArgs &args);
+        uint32_t addInterval(const int interval, util::Callback *pCallback,
+                             const int repeats = -1, WrappedArgs &args = WrappedArgs());
 
         template <typename ReturnType, typename... Args>
-        uint32_t addInterval(const int interval, const int repeats, ReturnType (*function)(Args...),
-                             WrappedArgs &args = WrappedArgs(),
+        uint32_t addInterval(const int interval, ReturnType (*function)(Args...),
+                             const int repeats = -1, WrappedArgs &args = WrappedArgs(),
                              const std::initializer_list<std::string> &argNames = {});
 
         template <typename UserClass, typename ReturnType, typename... Args>
-        uint32_t addInterval(const int interval, const int repeats, UserClass *pObject,
+        uint32_t addInterval(const int interval, UserClass *pObject,
                              ReturnType (UserClass::*methodMember)(Args...),
-                             WrappedArgs &args = WrappedArgs(),
+                             const int repeats = -1, WrappedArgs &args = WrappedArgs(),
                              const std::initializer_list<std::string> &argNames = {});
 
         inline bool removeInterval(const uint32_t id) { return removeTimer(id); };
@@ -170,7 +171,9 @@ namespace event
          * This function must be called in every frame in one of the threads
          * (or just the main thread)
          */
-        void executeEvents(void);
+        void processEventsAndTimers(void);
+        void processTimers(void);
+        void processEvents(void);
 
     private:
         void pushToFreeSlot(EventBase *pEventStruct);
@@ -365,21 +368,22 @@ namespace event
     //>-----------------------------------------------------------------------------------
 
     template <typename ReturnType, typename... Args>
-    uint32_t EventManager::addInterval(const int interval, const int repeats, ReturnType (*function)(Args...),
-                                       WrappedArgs &args, const std::initializer_list<std::string> &argNames)
+    uint32_t EventManager::addInterval(const int interval, ReturnType (*function)(Args...),
+                                       const int repeats, WrappedArgs &args,
+                                       const std::initializer_list<std::string> &argNames)
     {
-        m_timerEntries.emplace(std::move(TimerHelper::function<TimerEntryInfo::INTERVAL, ReturnType, Args...>(interval, repeats, function, argNames).setArgs(std::move(args))));
+        m_timerEntries.emplace(std::move(TimerHelper::function<TimerEntryInfo::INTERVAL, ReturnType, Args...>(interval, function, repeats, argNames).setArgs(std::move(args))));
         return m_timerEntries.back().getId();
     }
     //>-----------------------------------------------------------------------------------
 
     template <typename UserClass, typename ReturnType, typename... Args>
-    uint32_t EventManager::addInterval(const int interval, const int repeats, UserClass *pObject,
+    uint32_t EventManager::addInterval(const int interval, UserClass *pObject,
                                        ReturnType (UserClass::*methodMember)(Args...),
-                                       WrappedArgs &args,
+                                       const int repeats, WrappedArgs &args,
                                        const std::initializer_list<std::string> &argNames)
     {
-        m_timerEntries.emplace(std::move(TimerHelper::method<TimerEntryInfo::INTERVAL, UserClass, ReturnType, Args...>(interval, repeats, pObject, methodMember, argNames).setArgs(std::move(args))));
+        m_timerEntries.emplace(std::move(TimerHelper::method<TimerEntryInfo::INTERVAL, UserClass, ReturnType, Args...>(interval, pObject, methodMember, repeats, argNames).setArgs(std::move(args))));
         return m_timerEntries.back().getId();
     }
     //>-----------------------------------------------------------------------------------

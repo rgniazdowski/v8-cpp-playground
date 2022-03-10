@@ -1,5 +1,5 @@
 #include <event/EventManager.hpp>
-#include <util/timesys.hpp>
+#include <util/Timesys.hpp>
 #include <util/Util.hpp>
 
 event::EventManager::EventManager() : m_eventBinds(),
@@ -77,7 +77,7 @@ bool event::EventManager::initialize(void)
 {
     m_eventStructs.reserve(INITIAL_PTR_VEC_SIZE);
     m_init = true;
-    m_cleanupIntervalId = addInterval<EventManager, size_t>(-1, 60 * 1000, this, &EventManager::removeInactiveTimers);
+    m_cleanupIntervalId = addInterval<EventManager, size_t>(60 * 1000, this, &EventManager::removeInactiveTimers);
     return true;
 }
 //>---------------------------------------------------------------------------------------
@@ -332,7 +332,7 @@ event::TimerEntryInfo const *event::EventManager::getTimer(const uint32_t id) co
 } //> getTimer(...)
 //>---------------------------------------------------------------------------------------
 
-bool event::EventManager::hasTimer(const uint32_t id)
+bool event::EventManager::hasTimer(const uint32_t id) const
 {
     for (const auto &it : m_timerEntries)
     {
@@ -340,7 +340,7 @@ bool event::EventManager::hasTimer(const uint32_t id)
             return true;
     }
     return false;
-}
+} //> hasTimer(...)
 //>---------------------------------------------------------------------------------------
 
 bool event::EventManager::removeTimer(const uint32_t id)
@@ -356,7 +356,7 @@ bool event::EventManager::removeTimer(const uint32_t id)
     }
     std::swap(output, m_timerEntries);
     return true;
-}
+} //> removeTimer(...)
 //>---------------------------------------------------------------------------------------
 
 size_t event::EventManager::removeTimers(const std::vector<uint32_t> &ids)
@@ -381,7 +381,7 @@ size_t event::EventManager::removeTimers(const std::vector<uint32_t> &ids)
     }
     std::swap(output, m_timerEntries);
     return cnt;
-}
+} //> removeTimers(...)
 //>---------------------------------------------------------------------------------------
 
 size_t event::EventManager::removeInactiveTimers(void)
@@ -393,7 +393,7 @@ size_t event::EventManager::removeInactiveTimers(void)
             ids.push_back(it.getId());
     }
     return removeTimers(ids);
-}
+} //> removeInactiveTimers(...)
 //>---------------------------------------------------------------------------------------
 
 bool event::EventManager::removeTimer(const util::Callback *pCallback)
@@ -407,11 +407,11 @@ bool event::EventManager::removeTimer(const util::Callback *pCallback)
         }
     }
     return false;
-}
+} //> removeTimer(...)
 //>---------------------------------------------------------------------------------------
 
-uint32_t event::EventManager::addInterval(const int repeats, const int interval,
-                                          util::Callback *pCallback, WrappedArgs &args)
+uint32_t event::EventManager::addInterval(const int interval, util::Callback *pCallback,
+                                          const int repeats, WrappedArgs &args)
 {
     if (!pCallback)
         return 0;
@@ -423,7 +423,7 @@ uint32_t event::EventManager::addInterval(const int repeats, const int interval,
 } //> addInteval(...)
 //>---------------------------------------------------------------------------------------
 
-void event::EventManager::executeEvents(void)
+void event::EventManager::processTimers(void)
 {
     //#-----------------------------------------------------------------------------------
     //# Phase 1: Intervals & timeouts - universal
@@ -442,8 +442,13 @@ void event::EventManager::executeEvents(void)
             timer.call();
     } //# for each timer
     auto pCleanupTimer = getTimer(m_cleanupIntervalId);
-    if (pCleanupTimer)
+    if (pCleanupTimer && timeStamp >= pCleanupTimer->getTargetTs())
         pCleanupTimer->call(); // know that is not takes parameters
+} //> processTimers(...)
+//>---------------------------------------------------------------------------------------
+
+void event::EventManager::processEvents(void)
+{
     //#-----------------------------------------------------------------------------------
     //# Phase 2: execution of thrown events (now including the argument list).
     while (!m_eventsQueue.empty())
@@ -452,5 +457,12 @@ void event::EventManager::executeEvents(void)
         executeEvent(m_eventsQueue.front());
         m_eventsQueue.pop();
     } //> for each event on queue
+} //> processEvents(...)
+//>---------------------------------------------------------------------------------------
+
+void event::EventManager::processEventsAndTimers(void)
+{
+    processTimers();
+    processEvents();
 } //> executeEvents(...)
 //>---------------------------------------------------------------------------------------
