@@ -22,6 +22,7 @@ set(FG_ALL_INCLUDE_DIRS "")
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "Default value for CXX_STANDARD property of targets")
 # by default the main executable name will be the same as the project
 set(EXECUTABLE_NAME ${PROJECT_NAME})
+set(STATIC_LIB_NAME "${PROJECT_NAME}self_lib")
 
 find_program(VCPKG_EXE NAMES vcpkg)
 if(VCPKG_EXE MATCHES "VCPKG_EXE-NOTFOUND")

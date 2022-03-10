@@ -10,26 +10,115 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 if("${CMAKE_BUILD_PARALLEL_LEVEL}" STREQUAL "")
     set(CMAKE_BUILD_PARALLEL_LEVEL "8")
 endif()
+#-----------------------------------------------------------------------------------------
 #
-# Main sources (core lib & code)
-set(FlexiGame_FG_Main_Headers
+# Util sources
+set(FG_Util_Headers
+    util/AbstractFactory.hpp
+    util/Bindings.hpp
+    util/BindingsJson.hpp
+    util/CallbackHelper.hpp
+    util/Callbacks.hpp
+    util/Dirent.hpp
+    util/EnumFlags.hpp
+    util/EnumName.hpp
+    util/File.hpp
+    util/FileBase.hpp
+    util/Handle.hpp
+    util/HandleManager.hpp
+    util/JsonFile.hpp
+    util/NamedHandle.hpp
+    util/RegularFile.hpp
+    util/Tag.hpp
+    util/Timesys.hpp
+    util/UniversalId.hpp
+    util/UnpackCaller.hpp
+    util/Util.hpp
+    util/Vector.hpp
+    util/ZipFile.hpp
 )
-set(FlexiGame_FG_Main_Sources
+set(FG_Util_Sources
+    util/Dirent.cpp
+    util/File.cpp
+    util/RegularFile.cpp
+    util/Timesys.cpp
+    util/Util.cpp
+    util/ZipFile.cpp
+)
+#
+# Resource sources
+set(FG_Resource_Headers
+    resource/DataManager.hpp
+    resource/GlobalObjectRegistry.hpp
+    resource/ManagedDataFile.hpp
+    resource/ManagedObject.hpp
+    resource/Resource.hpp
+    resource/ResourceConfig.hpp
+    resource/ResourceConfigJson.hpp
+    resource/ResourceManager.hpp
+)
+set(FG_Resource_Sources
+    resource/ResourceManager.cpp
+)
+#
+# Event source
+set(FG_Event_Headers
+    event/EventDefinitions.hpp
+    event/EventHelper.hpp
+    event/EventManager.hpp
+    event/KeyVirtualCodes.hpp
+    event/ThrownEvent.hpp
+    event/TimerEntryInfo.hpp
+)
+set(FG_Event_Sources
+    event/EventManager.cpp
+)
+#
+# Root sources / base
+set(FG_Root_Headers
+    BuildConfig.hpp
+    Manager.hpp
+    Quality.hpp
+    Queue.hpp
+    Singleton.hpp
+    Unistd.hpp
+    WindowsStandard.hpp
+)
+set(FG_Root_Sources)
+#
+# Application sources & headers
+set(FG_Application_Headers)
+set(FG_Main_Sources
     main.cpp
     test.cpp
     serverx.cpp
-    util/timesys.cpp
-    util/Dirent.cpp
-    util/Util.cpp
-    util/ZipFile.cpp
-    util/RegularFile.cpp
-    util/File.cpp
 )
-
-source_group(main FILES ${FlexiGame_FG_Main_Sources})
-source_group(main\\inc FILES ${FlexiGame_FG_Main_Headers})
-
-#------------------------------------------------------------------------------
+set(FG_Application_Sources
+    ${FG_Main_Sources}
+)
+#
+# Static library files listing 
+set(FG_StaticLibrary_Headers
+    ${FG_Util_Headers}
+    ${FG_Resource_Headers}
+    ${FG_Event_Headers}
+    ${FG_Root_Headers}
+)
+set(FG_StaticLibrary_Sources
+    ${FG_Util_Sources}
+    ${FG_Resource_Sources}
+    ${FG_Event_Sources}
+    ${FG_Root_Sources}
+)
+source_group(main FILES ${FG_Root_Sources} ${FG_Main_Sources})
+source_group(main\\inc FILES ${FG_Root_Headers})
+source_group(util FILES ${FG_Util_Sources})
+source_group(util\\inc FILES ${FG_Util_Headers})
+source_group(resource FILES ${FG_Resource_Sources})
+source_group(resource\\inc FILES ${FG_Resource_Headers})
+source_group(event FILES ${FG_Event_Sources})
+source_group(event\\inc FILES ${FG_Event_Headers})
+#-----------------------------------------------------------------------------------------
 
 add_definitions(-DUSE_PRE_CONFIG)
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -40,20 +129,27 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 add_definitions(-D_HAS_AUTO_PTR_ETC=1)
 
+## Static library definition
+add_library(${STATIC_LIB_NAME} STATIC 
+    ${FG_StaticLibrary_Headers}
+    ${FG_StaticLibrary_Sources}
+)
 ## Target definitions
 add_executable(${EXECUTABLE_NAME}
-    ${FlexiGame_FG_Main_Headers}
-    ${FlexiGame_FG_Main_Sources}
+    ${FG_Application_Headers}
+    ${FG_Application_Sources}
 )
 
 ## Target libraries - FG_ALL_LIBRARIES contains everything
 target_link_libraries(${EXECUTABLE_NAME} PUBLIC ${FG_ALL_LIBRARIES})
+target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${STATIC_LIB_NAME})
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE V8::V8)
 target_compile_features(${EXECUTABLE_NAME} PRIVATE cxx_std_17)
 if(OS MATCHES "windows")
     set_target_properties(${EXECUTABLE_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
     set_target_properties(${EXECUTABLE_NAME} PROPERTIES VS_CONFIGURATION_TYPE "Application")
     target_compile_options(${EXECUTABLE_NAME} PRIVATE /MP${CMAKE_BUILD_PARALLEL_LEVEL})
+    target_compile_options(${STATIC_LIB_NAME} PRIVATE /MP${CMAKE_BUILD_PARALLEL_LEVEL})
 endif() # OS
 
 message(STATUS "Output (bin): ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
