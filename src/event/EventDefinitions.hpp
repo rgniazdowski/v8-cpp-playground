@@ -1,6 +1,7 @@
 #ifndef FG_INC_EVENT_DEFINITIONS
 #define FG_INC_EVENT_DEFINITIONS
 
+#include <util/Timesys.hpp>
 #include <event/KeyVirtualCodes.hpp>
 #include <util/Handle.hpp>
 
@@ -158,6 +159,8 @@ namespace event
         Type eventType;
         int64_t timeStamp;
         uint64_t identifier;
+
+        EventBase(Type _type = Type::Invalid) : eventType(_type), timeStamp(timesys::ticks()), identifier(EventBase::autoid()) {}
         inline uint64_t getIdentifier(void) const override { return identifier; }
         inline static uint64_t autoid(void) { return ++s_autoid; }
     };

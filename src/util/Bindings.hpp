@@ -234,7 +234,7 @@ namespace util
             return *this;
         }
 
-        WrappedValue &operator=(WrappedValue &&input)
+        WrappedValue &operator=(WrappedValue &&input) noexcept
         {
             if (this != &input)
             {
@@ -256,9 +256,9 @@ namespace util
             strvalue = input.strvalue;
         }
 
-        WrappedValue(WrappedValue &&input) : type(input.type),
-                                             tname(std::move(input.tname)),
-                                             strvalue(std::move(input.strvalue))
+        WrappedValue(WrappedValue &&input) noexcept : type(input.type),
+                                                      tname(std::move(input.tname)),
+                                                      strvalue(std::move(input.strvalue))
         {
             std::copy_n(&input.packed, 1, &packed); // copy one structure
             std::fill_n((uint8_t *)(&input.packed), sizeof(input.packed), static_cast<uint8_t>(0));
@@ -284,7 +284,7 @@ namespace util
         template <typename InputType, bool is_pointer = std::is_pointer_v<InputType>>
         static typename std::enable_if<is_pointer == true, WrappedValue *>::type wrap(const InputType value)
         {
-            return external<std::remove_pointer_t<InputType>>(&value);
+            return external<std::remove_pointer_t<InputType>>(value, 0);
         }
 
         static WrappedValue *wrap(const char *value)
@@ -304,7 +304,7 @@ namespace util
         template <typename InputType, bool is_pointer = std::is_pointer_v<InputType>>
         static typename std::enable_if<is_pointer == true, WrappedValue>::type wrapInPlace(const InputType value)
         {
-            return externalInPlace<std::remove_pointer_t<InputType>>(&value, 0);
+            return externalInPlace<std::remove_pointer_t<InputType>>(value, 0);
         }
 
         static WrappedValue wrapInPlace(const char *value)
@@ -313,49 +313,23 @@ namespace util
         }
         //>-------------------------------------------------------------------------------
 
-        template <typename T>
-        static WrappedValue *external(T **value, uint64_t id)
+        template <typename InputType>
+        static WrappedValue *external(const InputType *value, uint64_t id)
         {
-            return new WrappedValue(typeid(T *).name(), !value ? nullptr : *value, !value ? id : (*value)->getIdentifier());
+            return new WrappedValue(typeid(InputType).name(), !value ? nullptr : (void *)value, !value ? id : value->getIdentifier());
         }
 
-        template <typename T>
-        static WrappedValue externalInPlace(T **value, uint64_t id)
+        template <typename InputType>
+        static WrappedValue externalInPlace(const InputType *value, uint64_t id)
         {
-            return WrappedValue(typeid(T *).name(), !value ? nullptr : *value, !value ? id : (*value)->getIdentifier());
+            return WrappedValue(typeid(InputType).name(), !value ? nullptr : (void *)value, !value ? id : value->getIdentifier());
         }
-
-        //>-------------------------------------------------------------------------------
-
-        // template <typename T>
-        // static WrappedValue wrap_struct(const T &value)
-        //{
-        //     WrappedValue wrapped(sizeof(value), typeid(value).name());
-        //     wrapped.set(value);
-        //     return wrapped;
-        // }
-        // template <>
-        // static WrappedValue wrap_struct(const std::string &value)
-        //{
-        //     return WrappedValue(value, typeid(value).name());
-        // }
-        // template <unsigned int N>
-        // static WrappedValue wrap_struct(const char (&value)[N])
-        //{
-        //     return WrappedValue(std::string(value), typeid(value).name());
-        // }
 
     public:
         template <typename T>
-        operator T()
-        {
-            return get<T>();
-        }
+        operator T() { return get<T>(); }
 
-        operator std::string &()
-        {
-            return strvalue;
-        }
+        operator std::string &() { return strvalue; }
 
         operator const char *()
         {
@@ -544,7 +518,7 @@ namespace util
             this->wrappedFunction = [function](const WrappedValue::Args &args)
             {
                 auto value = unpack_caller(function, args);
-                return WrappedValue::externalInPlace(&value, value->getIdentifier());
+                return WrappedValue::externalInPlace(value, value->getIdentifier());
             };
         }
 
@@ -659,7 +633,7 @@ namespace util
             this->wrappedMethod = [methodMember](void *pObject, const WrappedValue::Args &args)
             {
                 auto value = unpack_caller(static_cast<UserClass *>(pObject), methodMember, args);
-                return WrappedValue::externalInPlace(&value, value->getIdentifier());
+                return WrappedValue::externalInPlace(value, value->getIdentifier());
             };
         }
 
@@ -726,7 +700,7 @@ namespace util
             this->wrappedMethod = [function](void *pObject, const WrappedValue::Args &args)
             {
                 auto value = unpack_caller(function, args);
-                return WrappedValue::externalInPlace(&value, value->getIdentifier());
+                return WrappedValue::externalInPlace(value, value->getIdentifier());
             };
         }
 
@@ -827,7 +801,7 @@ namespace util
             this->getterWrapped = [_getter](void *pObject)
             {
                 auto value = unpack_caller(static_cast<UserClass *>(pObject), _getter, WrappedValue::Args(0));
-                return WrappedValue::externalInPlace(&value, value->getIdentifier());
+                return WrappedValue::externalInPlace(value, value->getIdentifier());
             };
             if (_setter != nullptr)
             {
@@ -914,7 +888,7 @@ namespace util
             this->getterWrapped = [pThis](void *pObject)
             {
                 auto value = pThis->get(static_cast<UserClass *>(pObject));
-                return WrappedValue::externalInPlace(&value, value->getIdentifier());
+                return WrappedValue::externalInPlace(value, value->getIdentifier());
             };
 
             this->setterWrapped = [pThis](void *pObject, const WrappedValue::Args &args)
@@ -1000,14 +974,14 @@ namespace util
 
         WrappedAction() : type(UNSET), targetType(BindInfo::METHOD), targetName(), objectId(0), objectTypeName(), args(), result() {}
 
-        WrappedAction(WrappedAction &&in) : type(std::exchange(in.type, UNSET)),
-                                            targetType(std::exchange(in.targetType, BindInfo::METHOD)),
-                                            targetName(std::move(in.targetName)),
-                                            objectId(std::exchange(in.objectId, 0)),
-                                            objectTypeName(std::move(in.objectTypeName)),
-                                            args(std::move(in.args)),
-                                            result(std::move(in.result)),
-                                            nonce(std::move(in.nonce))
+        WrappedAction(WrappedAction &&in) noexcept : type(std::exchange(in.type, UNSET)),
+                                                     targetType(std::exchange(in.targetType, BindInfo::METHOD)),
+                                                     targetName(std::move(in.targetName)),
+                                                     objectId(std::exchange(in.objectId, 0)),
+                                                     objectTypeName(std::move(in.objectTypeName)),
+                                                     args(std::move(in.args)),
+                                                     result(std::move(in.result)),
+                                                     nonce(std::move(in.nonce))
         {
         }
 
@@ -1137,7 +1111,7 @@ namespace util
     {
         BindingHelper() = delete;
         BindingHelper(const BindingHelper &other) = delete;
-        //#-------------------------------------------------------------------------------
+        //>-------------------------------------------------------------------------------
 
         template <typename UserClass, typename ReturnType, typename... Args>
         static bool compare(const BindInfo *pBinding, ReturnType (UserClass::*methodMember)(Args...))
@@ -1146,7 +1120,7 @@ namespace util
                 return static_cast<const BindInfoMethod<UserClass, ReturnType, Args...> *>(pBinding)->compare(methodMember);
             return false;
         }
-        //#-------------------------------------------------------------------------------
+        //>-------------------------------------------------------------------------------
 
         template <typename ReturnType, typename... Args>
         static bool compare(const BindInfo *pBinding, ReturnType (*function)(Args...))
@@ -1155,7 +1129,7 @@ namespace util
                 return static_cast<const BindInfoFunction<ReturnType, Args...> *>(pBinding)->compare(function);
             return false;
         }
-        //#-------------------------------------------------------------------------------
+        //>-------------------------------------------------------------------------------
 
         template <typename UserClass, typename ReturnType, typename... Args>
         static ReturnType call(UserClass *pObject, const BindInfo *pBinding, Args &&...args)
@@ -1166,7 +1140,7 @@ namespace util
                 return BindingHelper::callMethod<UserClass, ReturnType, Args...>(pObject, pBinding, std::forward<Args>(args)...);
             throw std::invalid_argument("Unable to call binding - not a function / method");
         }
-        //#-------------------------------------------------------------------------------
+        //>-------------------------------------------------------------------------------
 
         template <typename ReturnType, typename... Args>
         static ReturnType callFunction(const BindInfo *pBinding, Args &&...args)
@@ -1178,7 +1152,7 @@ namespace util
             }
             throw std::invalid_argument("Unable to call binding - not a function");
         }
-        //#-------------------------------------------------------------------------------
+        //>-------------------------------------------------------------------------------
 
         template <typename UserClass, typename ReturnType, typename... Args>
         static ReturnType callMethod(UserClass *pObject, const BindInfo *pBinding, Args &&...args)
@@ -1190,7 +1164,7 @@ namespace util
             }
             throw std::invalid_argument("Unable to call binding - not a method");
         }
-        //#-------------------------------------------------------------------------------
+        //>-------------------------------------------------------------------------------
 
         template <typename UserClass, typename ReturnType>
         static ReturnType get(UserClass *pObject, const BindInfo *pBinding)
@@ -1207,7 +1181,7 @@ namespace util
             }
             throw std::invalid_argument("Unable to call get() - not a variable / property");
         }
-        //#-------------------------------------------------------------------------------
+        //>-------------------------------------------------------------------------------
 
         template <typename UserClass, typename InputType>
         static void set(UserClass *pObject, const BindInfo *pBinding, const InputType &value)
@@ -1226,7 +1200,7 @@ namespace util
             }
             throw std::invalid_argument("Unable to call set() - not a variable / property");
         }
-        //#-------------------------------------------------------------------------------
+        //>-------------------------------------------------------------------------------
 
         template <typename UserClass>
         static WrappedValue callWrapped(UserClass *pObject, const BindInfo *pBinding, const WrappedValue::Args &args)
@@ -1243,7 +1217,7 @@ namespace util
             }
             throw std::invalid_argument("Unable to call binding - not a function / method");
         }
-        //#-------------------------------------------------------------------------------
+        //>-------------------------------------------------------------------------------
 
         template <typename UserClass>
         static WrappedValue getWrapped(UserClass *pObject, const BindInfo *pBinding)
@@ -1260,7 +1234,7 @@ namespace util
             }
             throw std::invalid_argument("Unable to call get() - not a variable / property");
         }
-        //#-------------------------------------------------------------------------------
+        //>-------------------------------------------------------------------------------
 
         template <typename UserClass>
         static void setWrapped(UserClass *pObject, const BindInfo *pBinding, const WrappedValue::Args &args)
@@ -1279,7 +1253,7 @@ namespace util
             }
             throw std::invalid_argument("Unable to call set() - not a variable / property");
         }
-        //#-------------------------------------------------------------------------------
+        //>-------------------------------------------------------------------------------
     }; //# struct BindingHelper
 
     template <typename UserClass>

@@ -24,13 +24,10 @@ namespace event
         ThrownEvent(const ThrownEvent &other) = delete;
         ThrownEvent &operator=(const ThrownEvent &other) = delete;
 
-        ThrownEvent(ThrownEvent &&other) : eventCode(other.eventCode),
-                                           args(std::move(other.args))
-        {
-            other.eventCode = Type::Invalid;
-        }
+        ThrownEvent(ThrownEvent &&other) noexcept : eventCode(std::exchange(other.eventCode, Type::Invalid)),
+                                                    args(std::move(other.args)) {}
 
-        ThrownEvent &operator=(ThrownEvent &&other)
+        ThrownEvent &operator=(ThrownEvent &&other) noexcept
         {
             eventCode = other.eventCode;
             args = std::move(other.args);

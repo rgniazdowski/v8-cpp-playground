@@ -1,9 +1,11 @@
 #include <catch2/catch.hpp>
 
+#include <iostream>
 #include <chrono>
 #include <thread>
 
 #include <util/Timesys.hpp>
+#include <util/FpsControl.hpp>
 #include <event/EventManager.hpp>
 
 static bool g_shouldExit = false;
@@ -14,18 +16,19 @@ void triggerExit(void)
 }
 
 event::EventManager *initializeEventManager(void);
+void destroyEventManager(void);
 
 TEST_CASE("Initialize event manager I", "[timers]")
 {
     auto pEventMgr = initializeEventManager();
-    delete pEventMgr;
+    destroyEventManager();
 }
 //!---------------------------------------------------------------------------------------
 
 TEST_CASE("Create timers with callbacks", "[timers]")
 {
     auto pEventMgr = initializeEventManager();
-    delete pEventMgr;
+    destroyEventManager();
 }
 //!---------------------------------------------------------------------------------------
 
@@ -44,35 +47,15 @@ bool myTimer(void)
 TEST_CASE("Trigger timers in fake loop", "[timers]")
 {
     auto pEventMgr = initializeEventManager();
-    g_myTimerId = pEventMgr->addInterval(100, &myTimer);
-    int UPDATES_PER_SECOND = 60;
-    int WAIT_TICKS = 1000 / UPDATES_PER_SECOND;
-    int MAX_UPDATES_PER_SECOND = 120;
-    int MIN_WAIT_TICKS = 1000 / MAX_UPDATES_PER_SECOND;
-    int MAX_FRAMESKIP = 5;
-    auto nextUpdate = timesys::ticks();
-    auto lastUpdate = timesys::ticks();
-    int framesSkipped = 0;
-    float interpolation = 0.0f;
+    g_myTimerId = pEventMgr->addInterval(250, &myTimer);
+
+    util::FpsControl frameControl(30, 60);
     while (true)
     {
-        while (timesys::ticks() < lastUpdate + MIN_WAIT_TICKS)
-            std::this_thread::sleep_for(std::chrono::milliseconds(MIN_WAIT_TICKS / 5));
-        lastUpdate = timesys::ticks();
-        framesSkipped = 0;
-        while (timesys::ticks() > nextUpdate && framesSkipped < MAX_FRAMESKIP)
-        {
-            // trigger timers (could potentially queue new microtasks, to be processed on next tick)
-            pEventMgr->processEventsAndTimers();
-            // Schedule next update:
-            nextUpdate += WAIT_TICKS;
-            framesSkipped++;
-        }
-        // Calculate interpolation for smooth animation between states:
-        interpolation = ((float)(timesys::ticks() + WAIT_TICKS - nextUpdate)) / ((float)WAIT_TICKS);
+        frameControl.process(true, pEventMgr, &event::EventManager::processEventsAndTimers);
         if (!pEventMgr->hasTimers() || g_shouldExit)
             break;
     }
-    delete pEventMgr;
+    destroyEventManager();
 }
 //!---------------------------------------------------------------------------------------

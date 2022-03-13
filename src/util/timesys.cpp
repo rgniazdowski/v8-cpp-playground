@@ -1,23 +1,13 @@
 #include <BuildConfig.hpp>
 #include <util/Timesys.hpp>
-
-#if defined(FG_USING_PLATFORM_WINDOWS)
-#include <WindowsStandard.hpp>
-#include <timeapi.h>
-#else
-#include <sys/time.hpp>
-#endif
+#include <limits>
 
 namespace timesys
 {
-#if defined(FG_USING_PLATFORM_WINDOWS)
-    static DWORD g_start;
-#else
-    static struct timeval g_start;
-#endif
-    static float s_start = -1.0;
-    static float s_current[NUM_TICK_CATEGORIES] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
-    static float s_lastTick[NUM_TICK_CATEGORIES] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+    static double g_start;
+    static double s_start = -1.0;
+    static double s_current[NUM_TICK_CATEGORIES] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+    static double s_lastTick[NUM_TICK_CATEGORIES] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
 
     const char *const g_TickCategoriesText[] = {
         "UPDATE",
@@ -36,11 +26,7 @@ namespace timesys
 
 void timesys::init(void)
 {
-#ifdef FG_USING_PLATFORM_WINDOWS
-    g_start = timeGetTime();
-#else
-    gettimeofday(&timesys::g_start, NULL);
-#endif
+    g_start = ms() / 1000.0f; // seconds
     for (int id = 0; id < NUM_TICK_CATEGORIES; id++)
     {
         timesys::s_current[id] = 0.0;
@@ -51,14 +37,7 @@ void timesys::init(void)
 
 void timesys::markTick(TickCategory category)
 {
-#ifdef FG_USING_PLATFORM_WINDOWS
-    float newTime = (float)timeGetTime() / 1000.0f;
-#else
-    struct timeval dtime;
-    gettimeofday(&dtime, NULL);
-    float newTime = float(dtime.tv_sec - timesys::g_start.tv_sec +
-                          dtime.tv_usec / 1000000.0f - timesys::g_start.tv_usec / 1000000.0f);
-#endif
+    double newTime = ms() / 1000.0f;
     auto catidx = (unsigned int)category;
     timesys::s_lastTick[catidx] = newTime - timesys::s_current[catidx];
     timesys::s_current[catidx] = newTime;
@@ -67,28 +46,22 @@ void timesys::markTick(TickCategory category)
 }
 //>---------------------------------------------------------------------------------------
 
-float timesys::elapsed(TickCategory category)
+double timesys::elapsed(TickCategory category)
 {
     return timesys::s_lastTick[(unsigned int)category];
 }
 //>---------------------------------------------------------------------------------------
 
-float timesys::exact(void)
+double timesys::exact(void)
 {
-#if defined(FG_USING_PLATFORM_WINDOWS)
-    return (float)timeGetTime() / 1000.0f;
-#else
-    struct timeval dtime;
-    gettimeofday(&dtime, NULL);
-    return float(dtime.tv_sec - timesys::g_start.tv_sec) +
-		float(dtime.tv_usec - timesys::g_start.tv_usec) / 1000000.0f);
-#endif
+    auto ts = ms() / 1000.0f; // seconds
+    return (ts - g_start);
 }
 //>---------------------------------------------------------------------------------------
 
-float timesys::ms(void)
+double timesys::ms(void)
 {
-    return ((float)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) / 1000.0f;
+    return ((double)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) / 1000.0f;
 }
 //>---------------------------------------------------------------------------------------
 
@@ -103,8 +76,35 @@ int64_t timesys::ticks(void)
 #if defined(FG_USING_SDL) || defined(FG_USING_SDL2)
     return (int64_t)SDL_GetTicks();
 #else
-    // return (int64_t)(timesys::ms());
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+#endif
+}
+//>---------------------------------------------------------------------------------------
+#if defined(FG_USING_WINDOWS)
+#include <WindowsStandard.hpp>
+#elif defined(FG_USING_LINUX)
+#include <ctime>
+#include <cerrno>
+#endif
+void timesys::sleep(unsigned int ms)
+{
+    if (!ms)
+        ms = 5;
+#if defined(FG_USING_WINDOWS)
+    ::LARGE_INTEGER ft;
+    ft.QuadPart = -static_cast<int64>(ms * 1000 * 1000 * 10); // '-' using relative time
+
+    ::HANDLE timer = ::CreateWaitableTimer(NULL, TRUE, NULL);
+    ::SetWaitableTimer(timer, &ft, 0, NULL, NULL, 0);
+    ::WaitForSingleObject(timer, INFINITE);
+    ::CloseHandle(timer);
+#elif defined(FG_USING_LINUX)
+    struct timespec ts;
+    ts.tv_sec = ms / 1000;
+    ts.tv_nsec = ms % 1000 * 1000000;
+    while (nanosleep(&ts, &ts) == -1 && errno == EINTR)
+    {
+    };
 #endif
 }
 //>---------------------------------------------------------------------------------------

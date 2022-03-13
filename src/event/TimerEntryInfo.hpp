@@ -57,7 +57,7 @@ namespace event
         TimerEntryInfo(const TimerEntryInfo &other) = delete;
         TimerEntryInfo &operator=(const TimerEntryInfo &other) = delete;
 
-        TimerEntryInfo(TimerEntryInfo &&other) : callback(std::move(other.callback)), args(std::move(other.args))
+        TimerEntryInfo(TimerEntryInfo &&other) noexcept : callback(std::move(other.callback)), args(std::move(other.args))
         {
             id = other.id;
             type = other.type;
@@ -72,7 +72,7 @@ namespace event
             other.triggered = false;
         }
 
-        TimerEntryInfo &operator=(TimerEntryInfo &&other)
+        TimerEntryInfo &operator=(TimerEntryInfo &&other) noexcept
         {
             util::reset_arguments(args); // cleanup previous value
             callback = std::move(other.callback);

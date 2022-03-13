@@ -65,21 +65,15 @@ namespace resource
     public:
         using self_type = WrappedDataManager;
 
-        WrappedDataManager(const self_type &other)
-        {
-            m_getDataManager = other.m_getDataManager;
-            m_dereferenceHandle = other.m_dereferenceHandle;
-            m_dereferenceString = other.m_dereferenceString;
-            m_dereferenceNamedHandle = other.m_dereferenceNamedHandle;
-        }
+        WrappedDataManager(const self_type &other) : fnGetDataManager(other.fnGetDataManager),
+                                                     fnDereferenceHandle(other.fnDereferenceHandle),
+                                                     fnDereferenceString(other.fnDereferenceString),
+                                                     fnDereferenceNamedHandle(other.fnDereferenceNamedHandle) {}
 
-        WrappedDataManager(self_type &&other)
-        {
-            m_getDataManager = std::move(other.m_getDataManager);
-            m_dereferenceHandle = std::move(other.m_dereferenceHandle);
-            m_dereferenceString = std::move(other.m_dereferenceString);
-            m_dereferenceNamedHandle = std::move(other.m_dereferenceNamedHandle);
-        }
+        WrappedDataManager(self_type &&other) noexcept : fnGetDataManager(std::move(other.fnGetDataManager)),
+                                                         fnDereferenceHandle(std::move(other.fnDereferenceHandle)),
+                                                         fnDereferenceString(std::move(other.fnDereferenceString)),
+                                                         fnDereferenceNamedHandle(std::move(other.fnDereferenceNamedHandle)) {}
 
         ~WrappedDataManager() {}
 
@@ -99,31 +93,31 @@ namespace resource
             // manager without specifying original template parameters.
             // This forces to static cast back and forth to void, but it is guaranteed that
             // return type is a pointer and a proper handle manager was wrapped at all.
-            self.m_dereferenceHandle = [pManager](uint64_t handle)
+            self.fnDereferenceHandle = [pManager](uint64_t handle)
             { return static_cast<void *>(pManager->get(THandleType(handle))); };
-            self.m_dereferenceString = [pManager](const std::string &nameTag)
+            self.fnDereferenceString = [pManager](const std::string &nameTag)
             { return static_cast<void *>(pManager->get(nameTag)); };
-            self.m_dereferenceNamedHandle = [pManager](util::NamedHandle &nameTag)
+            self.fnDereferenceNamedHandle = [pManager](util::NamedHandle &nameTag)
             { return static_cast<void *>(pManager->get(nameTag)); };
-            self.m_getDataManager = [pManager]()
+            self.fnGetDataManager = [pManager]()
             { return static_cast<void *>(pManager); };
             return self;
         }
 
     public:
         template <typename TUserType, typename THandleType>
-        TUserType *dereference(const THandleType &handle) const { return static_cast<TUserType *>(m_dereferenceHandle(handle.getHandle())); }
+        TUserType *dereference(const THandleType &handle) const { return static_cast<TUserType *>(fnDereferenceHandle(handle.getHandle())); }
 
         template <typename TUserType>
-        TUserType *dereference(uint64_t handle) const { return static_cast<TUserType *>(m_dereferenceHandle(handle)); }
+        TUserType *dereference(uint64_t identifier) const { return static_cast<TUserType *>(fnDereferenceHandle(identifier)); }
 
         template <typename TUserType>
-        TUserType *dereference(const std::string &nameTag) const { return static_cast<TUserType *>(m_dereferenceString(nameTag)); }
+        TUserType *dereference(const std::string &nameTag) const { return static_cast<TUserType *>(fnDereferenceString(nameTag)); }
 
         template <typename TUserType>
-        TUserType *dereference(util::NamedHandle &nameTag) const { return static_cast<TUserType *>(m_dereferenceNamedHandle(nameTag)); }
+        TUserType *dereference(util::NamedHandle &nameTag) const { return static_cast<TUserType *>(fnDereferenceNamedHandle(nameTag)); }
 
-        void *getManager(void) const { return m_getDataManager(); }
+        void *getManager(void) const { return this->fnGetDataManager(); }
 
         self_type const *self(void) const { return this; }
 
@@ -135,10 +129,10 @@ namespace resource
         using DereferenceNamedHandle = std::function<void *(util::NamedHandle &)>;
         using GetDataManager = std::function<void *()>;
 
-        GetDataManager m_getDataManager;
-        DereferenceHandle m_dereferenceHandle;
-        DereferenceString m_dereferenceString;
-        DereferenceNamedHandle m_dereferenceNamedHandle;
+        GetDataManager fnGetDataManager;
+        DereferenceHandle fnDereferenceHandle;
+        DereferenceString fnDereferenceString;
+        DereferenceNamedHandle fnDereferenceNamedHandle;
     }; //# class WrappedHandleManager
 } //> namespace resource
 

@@ -2,15 +2,23 @@
 
 #include <event/EventManager.hpp>
 
+event::EventManager *g_eventMgr = nullptr;
+
 event::EventManager *initializeEventManager(void)
 {
-    static event::EventManager *pEventMgr = nullptr;
-    if (!pEventMgr)
+    if (!g_eventMgr)
     {
-        pEventMgr = new event::EventManager();
-        REQUIRE(pEventMgr->initialize());
+        g_eventMgr = new event::EventManager();
+        REQUIRE(g_eventMgr->initialize());
     }
-    return pEventMgr;
+    return g_eventMgr;
+}
+
+void destroyEventManager(void)
+{
+    if (g_eventMgr != nullptr)
+        delete g_eventMgr;
+    g_eventMgr = nullptr;
 }
 
 TEST_CASE("Initialize event manager II", "[events]")

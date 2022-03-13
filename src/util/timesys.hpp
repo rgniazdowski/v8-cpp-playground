@@ -17,7 +17,7 @@ namespace timesys
         NUM_TICK_CATEGORIES = 6
     };
 
-    inline const float MINIMUM_TICK = 0.001f;
+    inline const double MINIMUM_TICK = 0.001;
     inline const TickCategory DEFAULT_TICK_CATEGORY = TICK_PRERENDER;
 
     /**
@@ -35,15 +35,15 @@ namespace timesys
      * @param category
      * @return
      */
-    float elapsed(TickCategory category = DEFAULT_TICK_CATEGORY);
+    double elapsed(TickCategory category = DEFAULT_TICK_CATEGORY);
     /**
      * Get exact time since init (seconds)
      * @return
      */
-    float exact(void);
+    double exact(void);
     /**
      * Platform independent function for getting time in milliseconds
-     * as a unsigned long value (for more accurate float - use ms()
+     * as a unsigned long value (for more accurate double - use ms()
      * This function gets time in miliseconds. It doesnt matter from what
      * point in time this is calculated - it is used for delta time mostly.
      * This function is very similar in usage as the SDL_GetTicks().
@@ -54,13 +54,14 @@ namespace timesys
      * Get time since init in milliseconds
      * @return
      */
-    float ms(void);
+    double ms(void);
     /**
      * Get the number of seconds since 00:00 hours, Jan 1, 1970 UTC
      * (i.e., the current unix timestamp). Uses time(null)
      * @return
      */
     int64_t seconds(void);
+    void sleep(unsigned int ms);
 } //> namespace timesys
 
 #endif //> FG_INC_TIMESYS

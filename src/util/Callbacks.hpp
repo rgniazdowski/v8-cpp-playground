@@ -25,7 +25,7 @@ namespace util
     protected:
         Callback(CallbackType type) : m_type(type), m_binding() {}
         Callback(CallbackType type, BindInfo *pBinding) : m_type(type), m_binding(pBinding) {}
-        Callback(Callback &&other) : m_binding(std::move(other.m_binding)), m_type(other.m_type) { other.m_type = 0; }
+        Callback(Callback &&other) noexcept : m_binding(std::move(other.m_binding)), m_type(other.m_type) { other.m_type = 0; }
 
     public:
         virtual ~Callback() { m_type = CALLBACK_INVALID; }
