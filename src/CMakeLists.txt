@@ -24,10 +24,13 @@ set(FG_Util_Headers
     util/EnumName.hpp
     util/File.hpp
     util/FileBase.hpp
+    util/FpsControl.hpp
     util/Handle.hpp
     util/HandleManager.hpp
     util/JsonFile.hpp
+    util/Logger.hpp
     util/NamedHandle.hpp
+    util/Profiling.hpp
     util/RegularFile.hpp
     util/Tag.hpp
     util/Timesys.hpp
@@ -40,6 +43,8 @@ set(FG_Util_Headers
 set(FG_Util_Sources
     util/Dirent.cpp
     util/File.cpp
+    util/Logger.cpp
+    util/Profiling.cpp
     util/RegularFile.cpp
     util/Timesys.cpp
     util/Util.cpp
@@ -77,6 +82,7 @@ set(FG_Event_Sources
 # Root sources / base
 set(FG_Root_Headers
     BuildConfig.hpp
+    EngineMain.hpp
     Manager.hpp
     Quality.hpp
     Queue.hpp
@@ -84,7 +90,9 @@ set(FG_Root_Headers
     Unistd.hpp
     WindowsStandard.hpp
 )
-set(FG_Root_Sources)
+set(FG_Root_Sources
+    EngineMain.cpp
+)
 #
 # Application sources & headers
 set(FG_Application_Headers)
