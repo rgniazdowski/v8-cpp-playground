@@ -11,7 +11,7 @@ namespace util
     struct UniversalIdBase
     {
     protected:
-        inline static uint8_t s_gid = 0;
+        inline static uint32_t s_gid = 0;
     };
 
     template <typename UserClass>
@@ -62,10 +62,10 @@ namespace util
 
     private:
         inline static bool s_idset = false;
-        inline static uint8_t s_lid = 0;
+        inline static uint32_t s_lid = 0;
 
     public:
-        static uint8_t id()
+        static uint32_t id()
         {
             if (!s_idset)
                 s_lid = (s_idset ? s_gid : ++s_gid);

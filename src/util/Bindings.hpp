@@ -7,7 +7,9 @@
 #include <typeinfo>
 #include <functional>
 #include <string>
+#include <util/UniversalId.hpp>
 #include <util/Vector.hpp>
+#include <util/Util.hpp>
 #include <util/UnpackCaller.hpp>
 
 namespace util
@@ -108,6 +110,7 @@ namespace util
         struct External
         {
             uint64_t handle;
+            uint32_t tid;
             void *pointer;
         };
         union
@@ -126,19 +129,19 @@ namespace util
         std::string strvalue;
 
     public:
-        const std::string &getTypeName(void) const noexcept { return tname; }
+        inline const std::string &getTypeName(void) const noexcept { return tname; }
 
-        constexpr bool isExternal(void) const noexcept { return type == EXTERNAL; }
+        inline bool isExternal(void) const noexcept { return type == EXTERNAL; }
 
-        constexpr bool isString(void) const noexcept { return type == STRING; }
+        inline bool isString(void) const noexcept { return type == STRING; }
 
-        constexpr bool isValid(void) const noexcept { return type != INVALID; }
+        inline bool isValid(void) const noexcept { return type != INVALID; }
 
-        constexpr bool isEmpty(void) const noexcept { return type == INVALID; }
+        inline bool isEmpty(void) const noexcept { return type == INVALID; }
 
-        constexpr Type getType(void) const noexcept { return type; }
+        inline Type getType(void) const noexcept { return type; }
 
-        constexpr uint64_t getExternalHandle(void) const
+        inline uint64_t getExternalHandle(void) const
         {
             if (type == EXTERNAL)
                 return packed.external.handle;
@@ -154,7 +157,7 @@ namespace util
 
     public:
         template <typename InputType>
-        void set(const InputType &value)
+        inline void set(const InputType &value)
         {
             tname = typeid(InputType).name();
             type = WrappedValue::determineInternalType(tname); // overwrite
@@ -164,7 +167,7 @@ namespace util
         }
 
         template <>
-        void set(const std::string &value)
+        inline void set<std::string>(const std::string &value)
         {
             tname = typeid(std::string).name();
             type = STRING;
@@ -211,11 +214,12 @@ namespace util
             std::fill_n((uint8_t *)(&packed), sizeof(packed), static_cast<uint8_t>(0));
         }
 
-        WrappedValue(const char *_tname, void *_external, uint64_t _handle) : tname(_tname), type(EXTERNAL)
+        WrappedValue(const char *_tname, void *_external, uint64_t _handle, uint32_t _tid) : tname(_tname), type(EXTERNAL)
         {
             std::fill_n((uint8_t *)(&packed), sizeof(packed), static_cast<uint8_t>(0));
             packed.external.pointer = _external;
             packed.external.handle = _handle;
+            packed.external.tid = _tid;
         }
 
         WrappedValue(const std::string &str, const char *_tname) : tname(_tname), type(STRING), strvalue(str)
@@ -272,6 +276,7 @@ namespace util
             tname.clear();
             strvalue.clear();
         }
+        //>-------------------------------------------------------------------------------
 
         template <typename InputType, bool is_pointer = std::is_pointer_v<InputType>>
         static typename std::enable_if<is_pointer == false, WrappedValue *>::type wrap(const InputType &value)
@@ -316,18 +321,27 @@ namespace util
         template <typename InputType>
         static WrappedValue *external(const InputType *value, uint64_t id)
         {
-            return new WrappedValue(typeid(InputType).name(), !value ? nullptr : (void *)value, !value ? id : value->getIdentifier());
+            using data_type = std::decay_t<InputType>;
+            return new WrappedValue(typeid(data_type).name(),
+                                    !value ? nullptr : (void *)value,
+                                    !value ? id : value->getIdentifier(),
+                                    UniversalId<data_type>::id());
         }
 
         template <typename InputType>
         static WrappedValue externalInPlace(const InputType *value, uint64_t id)
         {
-            return WrappedValue(typeid(InputType).name(), !value ? nullptr : (void *)value, !value ? id : value->getIdentifier());
+            using data_type = std::decay_t<InputType>;
+            return WrappedValue(typeid(data_type).name(),
+                                !value ? nullptr : (void *)value,
+                                !value ? id : value->getIdentifier(),
+                                UniversalId<data_type>::id());
         }
+        //>-------------------------------------------------------------------------------
 
     public:
-        template <typename T>
-        operator T() { return get<T>(); }
+        template <typename DataType>
+        operator DataType() { return get<DataType>(); }
 
         operator std::string &() { return strvalue; }
 
@@ -354,7 +368,9 @@ namespace util
     }; //# class WrappedValue
     //#-----------------------------------------------------------------------------------
 
-    inline WrappedValue::Args &reset_arguments(WrappedValue::Args &args)
+    using WrappedArgs = WrappedValue::Args;
+
+    inline WrappedArgs &reset_arguments(WrappedArgs &args)
     {
         for (auto idx = 0; idx < args.size(); idx++)
         {
@@ -364,6 +380,16 @@ namespace util
         }
         args.clear();
         return args;
+    }
+
+    inline void copy_arguments(const WrappedArgs &args, WrappedArgs &output)
+    {
+        util::reset_arguments(output); // force clear the target (destructors are called)
+        if (args.empty())
+            return; // nothing to do
+        output.reserve(args.size());
+        for (auto &it : args)
+            output.push_back(WrappedValue::wrap(it));
     }
     //#-----------------------------------------------------------------------------------
 

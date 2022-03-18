@@ -98,9 +98,8 @@ namespace util
         template <typename TUserType>
         bool registerObjectType(const key_type &key, std::string_view keyName, std::string_view fileExtensions = "")
         {
-            using data_type = std::remove_pointer_t<TUserType>;
-            using id_type = typename data_type::universal_id;
-            static_assert(std::is_base_of_v<UniversalIdBase, id_type>, "TUserType should contain typedef 'universal_id' with base type of 'UniversalId'.");
+            using data_type = std::decay_t<TUserType>;
+            using id_type = util::UniversalId<data_type>;
             id_type::id();          // ensure to bump up the unique id (automatic)
             id_type::name(keyName); // try to trigger first use of input name
             auto it = m_factoryMap.find(key);
@@ -114,9 +113,8 @@ namespace util
         template <typename TUserType>
         bool registerObjectType(std::string_view fileExtensions = "")
         {
-            using data_type = std::remove_pointer_t<TUserType>;
-            using id_type = typename data_type::universal_id;
-            static_assert(std::is_base_of_v<UniversalIdBase, id_type>, "TUserType should contain typedef 'universal_id' with base type of 'UniversalId'.");
+            using data_type = std::decay_t<TUserType>;
+            using id_type = util::UniversalId<data_type>;
             return registerObjectType<data_type>(id_type::id(), id_type::name(), fileExtensions);
         }
 
@@ -184,6 +182,7 @@ namespace util
         {
             if (!pResult)
                 return false;
+            *pResult = nullptr;
             if (!isRegistered(keyName))
                 return false;
             auto it = m_nameMap.find(keyName);
@@ -198,7 +197,8 @@ namespace util
         {
             if (!pResult)
                 return false;
-            if (!isRegistered(key))
+            *pResult = nullptr;
+            if (!pSource || !isRegistered(key))
                 return false;
             if (!m_factoryMap[key])
                 return false;
@@ -210,7 +210,8 @@ namespace util
         {
             if (!pResult)
                 return false;
-            if (!isRegistered(keyName))
+            *pResult = nullptr;
+            if (!pSource || !isRegistered(keyName))
                 return false;
             auto it = m_nameMap.find(keyName);
             auto key = it->second;

@@ -90,7 +90,7 @@ namespace util
     template <typename TagType>
     class Handle : public HandleBase
     {
-        static_assert(std::is_base_of<TagBase, TagType>::value, "TagType template parameter type needs to be derived from TagBase");
+        static_assert(std::is_base_of_v<TagBase, TagType>, "TagType template parameter type needs to be derived from TagBase");
 
     public:
         using self_type = Handle<TagType>;
@@ -142,8 +142,10 @@ namespace util
         static const char *getTagName(void) { return tag_type::name(); }
     }; //# class Handle<TagType>
 
-    class ObjectWithIdentifier {
-        public:
+    class ObjectWithIdentifier
+    {
+    public:
+        ObjectWithIdentifier() {}
         virtual uint64_t getIdentifier(void) const = 0;
     }; //> class ObjectWithIdentifier
     class ObjectWithHandle : public ObjectWithIdentifier
