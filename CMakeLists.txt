@@ -160,20 +160,6 @@ endif() #USING_LOG4CPLUS
 #-----------------------------------------------------------------------------------------
 
 #
-# 
-if(USING_CPPBTREE)    
-    CPMAddPackage(
-        NAME cppbtree
-        GITHUB_REPOSITORY Kronuz/cpp-btree
-        GIT_TAG master
-        DOWNLOAD_ONLY YES
-    )
-    if(cppbtree_ADDED)
-        set(FG_ALL_INCLUDE_DIRS ${FG_ALL_INCLUDE_DIRS} "${cppbtree_SOURCE_DIR}")
-    endif() #cppbtree_ADDED
-endif() #USING_CPPBTREE
-
-#
 # Header-only library to expose C++ classes and functions into V8 for use in JavaScript code.
 if(USING_V8PP)
     CPMAddPackage(
@@ -210,7 +196,7 @@ if(USING_V8PP)
         set(v8pp_BUILD_DIR "${CMAKE_BINARY_DIR}/_deps/v8pp-build")
         add_subdirectory("${v8pp_SOURCE_DIR}" "${v8pp_BUILD_DIR}")
 
-        set(FG_ALL_INCLUDE_DIRS ${FG_ALL_INCLUDE_DIRS} "${v8pp_SOURCE_DIR}" "${v8pp_BUILD_DIR}")
+        set(FG_ALL_INCLUDE_DIRS ${FG_ALL_INCLUDE_DIRS} ${v8pp_SOURCE_DIR} ${v8pp_BUILD_DIR} ${V8_INCLUDE_DIRS})
         endif() #v8pp_ADDED
 endif() #USING_V8PP
 #-----------------------------------------------------------------------------------------

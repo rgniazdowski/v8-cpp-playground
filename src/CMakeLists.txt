@@ -79,6 +79,16 @@ set(FG_Event_Sources
     event/EventManager.cpp
 )
 #
+# Script source
+set(FG_Script_Headers
+    script/ScriptManager.hpp
+    script/V8.hpp
+)
+set(FG_Script_Sources
+    script/ScriptManager.cpp
+    script/V8.cpp
+)
+#
 # Root sources / base
 set(FG_Root_Headers
     BuildConfig.hpp
@@ -110,12 +120,14 @@ set(FG_StaticLibrary_Headers
     ${FG_Util_Headers}
     ${FG_Resource_Headers}
     ${FG_Event_Headers}
+    ${FG_Script_Headers}
     ${FG_Root_Headers}
 )
 set(FG_StaticLibrary_Sources
     ${FG_Util_Sources}
     ${FG_Resource_Sources}
     ${FG_Event_Sources}
+    ${FG_Script_Sources}
     ${FG_Root_Sources}
 )
 source_group(main FILES ${FG_Root_Sources} ${FG_Main_Sources})
@@ -126,6 +138,8 @@ source_group(resource FILES ${FG_Resource_Sources})
 source_group(resource\\inc FILES ${FG_Resource_Headers})
 source_group(event FILES ${FG_Event_Sources})
 source_group(event\\inc FILES ${FG_Event_Headers})
+source_group(script FILES ${FG_Script_Sources})
+source_group(script\\inc FILES ${FG_Script_Headers})
 #-----------------------------------------------------------------------------------------
 
 add_definitions(-DUSE_PRE_CONFIG)
