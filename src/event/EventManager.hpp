@@ -7,6 +7,8 @@
 #include <event/EventDefinitions.hpp>
 #include <event/EventHelper.hpp>
 
+#include <mutex>
+
 namespace event
 {
     class EventManager : public base::Manager<EventManager>
@@ -14,6 +16,9 @@ namespace event
     public:
         using base_type = base::Manager<EventManager>;
         using self_type = EventManager;
+
+        using EventFilterFunction = std::function<bool(const ThrownEvent &)>;
+        using TimerFilterFunction = std::function<bool(const TimerEntryInfo &)>;
 
     public:
         /// Maximum number of allocated internal event structures
@@ -166,6 +171,9 @@ namespace event
 
         //#-------------------------------------------------------------------------------
 
+        //?void addEventFilter(const EventFilterFunction &eventFilter);
+        //?void addTimerFilter(const TimerFilterFunction &timerFilter);
+
         /**
          * Execute (finalized) all events waiting in a queue
          * This function must be called in every frame in one of the threads
@@ -192,6 +200,10 @@ namespace event
         EventsPtrVec m_eventStructs;
         ///
         EventsPtrVec m_eventStructsFreeSlots;
+        ///
+        mutable std::mutex m_mutexEvents;
+        ///
+        mutable std::mutex m_mutexTimers;
     }; //# class EventManager
 
     template <typename UserClass, typename ReturnType, typename... Args>

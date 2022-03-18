@@ -2,7 +2,8 @@
 #include <util/Timesys.hpp>
 #include <util/Util.hpp>
 
-event::EventManager::EventManager() : m_eventBinds(),
+event::EventManager::EventManager() : base_type(),
+                                      m_eventBinds(),
                                       m_eventsQueue(),
                                       m_timerEntries(),
                                       m_cleanupIntervalId(),
@@ -30,9 +31,9 @@ void event::EventManager::resetArguments(WrappedArgs &args)
 {
     for (auto &arg : args)
     {
-        if (arg->isExternal() && arg->getExternalPointer() != nullptr)
+        if (arg->isExternal() && arg->getExternalPointer<void>() != nullptr)
         {
-            auto pStruct = reinterpret_cast<event::EventCombined *>(arg->getExternalPointer());
+            auto pStruct = reinterpret_cast<event::EventCombined *>(arg->getExternalPointer<void>());
             if (util::find(m_eventStructs, pStruct) >= 0)
                 pushToFreeSlot((EventBase *)pStruct);
         }

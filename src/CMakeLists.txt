@@ -32,6 +32,7 @@ set(FG_Util_Headers
     util/NamedHandle.hpp
     util/Profiling.hpp
     util/RegularFile.hpp
+    util/SimpleThread.hpp
     util/Tag.hpp
     util/Timesys.hpp
     util/UniversalId.hpp
