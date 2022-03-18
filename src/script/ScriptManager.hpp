@@ -52,12 +52,12 @@ namespace script
 
         bool scriptCallbackHandler(const util::WrappedArgs &args);
 
-        // protected:
-        void processPendingCallbacks(void);
-
         LocalContext getContext(const std::string &name = "main");
 
         inline v8::Isolate *getIsolate(void) { return m_isolate; }
+
+    protected:
+        void processPendingCallbacks(void);
 
     protected:
         char **m_argv;
@@ -115,7 +115,7 @@ namespace script
             }
         }; //# struct PendingCallback
         std::stack<PendingCallback> m_pendingCallbacks;
-        std::mutex m_mutex;
+        std::recursive_mutex m_mutex;
     }; //# class ScriptManager
 
 } //> namespace script

@@ -7,9 +7,18 @@ script::ScriptManager::ScriptManager(char **argv) : manager_type(), m_argv(argv)
 {
     m_thread.setFunction([this]()
                          {
+        v8::Locker locker(m_isolate);
+        v8::Isolate::Scope isolate_scope(m_isolate);
+        // Create a stack-allocated handle scope.
+        v8::HandleScope handle_scope(m_isolate);
+        auto context = this->getContext("main");
+        v8::Context::Scope context_scope(context);
+        m_isolate->RunMicrotasks(); // run microtasks from previous frame
         this->processPendingCallbacks();
-        return this; });
-    m_thread.setInterval(1000); // thread will wakeup by itself every second
+        return true; });
+    // thread will wakeup by itself every 1ms (1000fps) to run V8 microtasks and have
+    // callbacks triggered (from event thread)
+    m_thread.setInterval(1);
     m_thread.setWakeable(true);
 }
 //>---------------------------------------------------------------------------------------
@@ -46,17 +55,7 @@ bool script::ScriptManager::initialize(void)
         // entering (in another thread) a special event loop for microtasks and callbacks
     }
     m_init = true;
-    m_thread.startWrapped([this]()
-                          {
-                              // Need to select context and create handle scope
-                              // so any nested calls can retrieve entered context.
-                              v8::Isolate::Scope isolate_scope(m_isolate);
-                              // Create a stack-allocated handle scope.
-                              v8::HandleScope handle_scope(m_isolate);
-                              auto context = this->getContext("main");
-                              v8::Context::Scope context_scope(context);
-                              auto wrapper = this->getThreadWrapper();
-                              (this->*wrapper)(); });
+    m_thread.start();
     return true;
 }
 //>---------------------------------------------------------------------------------------
@@ -108,7 +107,7 @@ bool script::ScriptManager::scriptCallbackHandler(const util::WrappedArgs &args)
     // delete backcopy;  // this is a complete duplicate - release it
     //  arguments are copied over! (full duplication) in PendingCallback constructor
     {
-        const std::lock_guard<std::mutex> lock(m_mutex);
+        const std::lock_guard<std::recursive_mutex> lock(m_mutex);
         m_pendingCallbacks.emplace(_args, callback);
     }
     m_thread.wakeup(); // signal the thread because there are new callbacks pending
@@ -118,11 +117,14 @@ bool script::ScriptManager::scriptCallbackHandler(const util::WrappedArgs &args)
 
 void script::ScriptManager::processPendingCallbacks(void)
 {
-    const std::lock_guard<std::mutex> lock(m_mutex);
+    std::unique_lock<std::recursive_mutex> lock(m_mutex);
     v8::HandleScope handle_scope(m_isolate);
     auto context = m_isolate->GetEnteredContext();
-    while (!m_pendingCallbacks.empty())
+    while (true)
     {
+        lock.lock();
+        if (m_pendingCallbacks.empty())
+            break;
         auto &top = m_pendingCallbacks.top();
         auto callback = top.callback;
         auto &args = top.args;
@@ -158,7 +160,7 @@ void script::ScriptManager::processPendingCallbacks(void)
                 auto ex = tryCatch.Exception();
             }
         }
-        m_pendingCallbacks.pop();
+        lock.unlock();
     }
 }
 //>---------------------------------------------------------------------------------------
