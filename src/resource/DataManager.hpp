@@ -24,8 +24,10 @@ namespace resource
         using manager_type = base::Manager<self_type>;
         using handle_mgr_type = util::HandleManager<handle_type>;
 
-        static_assert(std::is_base_of<util::HandleBase, handle_type>::value, "THandleType template parameter type needs to be derived from HandleBase");
-        static_assert(std::is_base_of<ManagedObjectBase, data_type>::value, "TDataType template parameter type needs to be derived from ManagedObjectBase");
+        static_assert(std::is_base_of_v<util::HandleBase, handle_type>,
+                      "THandleType template parameter type needs to be derived from HandleBase");
+        static_assert(std::is_base_of_v<ManagedObjectBase, data_type>,
+                      "TDataType template parameter type needs to be derived from ManagedObjectBase");
 
     public:
         DataManagerBase() : manager_type(), handle_mgr_type() {}

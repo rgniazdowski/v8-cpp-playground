@@ -5,7 +5,8 @@
 #include <util/JsonFile.hpp>
 #include <Queue.hpp>
 
-resource::ResourceManager::ResourceManager(base::ManagerBase *pEventMgr) : m_currentResource(),
+resource::ResourceManager::ResourceManager(base::ManagerBase *pEventMgr) : base_type(),
+                                                                           m_currentResource(),
                                                                            m_resourceGroupHandles(),
                                                                            m_resourceFactory(std::make_unique<ResourceFactory>()),
                                                                            m_pEventMgr(pEventMgr),
@@ -24,12 +25,16 @@ resource::ResourceManager::~ResourceManager()
 
 bool resource::ResourceManager::destroy(void)
 {
+    if (!isInit())
+        return false;
     return true;
 }
 //>---------------------------------------------------------------------------------------
 
 bool resource::ResourceManager::initialize(void)
 {
+    if (isInit())
+        return true;
     m_dataDir.read(".", true, true);
     m_dataDir.rewind();
     return true;

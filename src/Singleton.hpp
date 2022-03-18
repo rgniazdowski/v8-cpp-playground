@@ -3,6 +3,8 @@
 #ifndef FG_INC_SINGLETON
 #define FG_INC_SINGLETON
 
+#include <mutex>
+
 namespace fg
 {
     template <typename Class>
@@ -11,6 +13,7 @@ namespace fg
     private:
         inline static bool _instanceFlag = false;
         inline static Class *_instance = nullptr;
+        inline static std::mutex _mutex = std::mutex();
 
     protected:
         Singleton() {}
@@ -19,6 +22,7 @@ namespace fg
         template <typename... Ts>
         static Class *instance(Ts... args)
         {
+            const std::lock_guard<std::mutex> lock(_mutex);
             if (!_instanceFlag || !_instance)
             {
                 if (!_instance)
@@ -27,12 +31,11 @@ namespace fg
                 return _instance;
             }
             else
-            {
                 return _instance;
-            }
         }
         static void deleteInstance()
         {
+            const std::lock_guard<std::mutex> lock(_mutex);
             if (_instanceFlag || _instance)
             {
                 _instanceFlag = false;

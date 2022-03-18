@@ -5,22 +5,24 @@
 #include <Singleton.hpp>
 #include <resource/DataManager.hpp>
 #include <resource/ManagedObject.hpp>
+
 #include <unordered_map>
+#include <mutex>
 
 namespace resource
 {
     class GlobalObjectRegistry : public fg::Singleton<GlobalObjectRegistry>
     {
     protected:
+        using base_type = fg::Singleton<GlobalObjectRegistry>;
         struct Wrapped
         {
             util::HandleHelper::Unpacked unpacked;
             uint64_t handle;
-            void *pointer;
+            util::ObjectWithIdentifier *pointer;
         };
         using RegistryMap = std::unordered_map<uint64_t, Wrapped>;
-
-        GlobalObjectRegistry() {}
+        GlobalObjectRegistry() : base_type(), m_dataManagers(), m_registry(), m_mutex() {}
         ~GlobalObjectRegistry() {}
 
     public:
@@ -92,11 +94,16 @@ namespace resource
             return true;
         }
 
-        bool hasDataManager(uint8_t tag) const { return m_dataManagers.find(tag) != m_dataManagers.end(); }
+        bool hasDataManager(uint8_t tag) const
+        {
+            const std::lock_guard<std::mutex> lock(m_mutex);
+            return m_dataManagers.find(tag) != m_dataManagers.end();
+        }
 
         template <typename THandleType>
         bool hasDataManager(DataManagerBase<THandleType> *pManager) const
         {
+            const std::lock_guard<std::mutex> lock(m_mutex);
             using manager_type = DataManagerBase<THandleType>;
             for (auto &it : m_dataManagers)
             {
@@ -111,6 +118,7 @@ namespace resource
         {
             if (!hasDataManager(tag))
                 return nullptr;
+            const std::lock_guard<std::mutex> lock(m_mutex);
             auto found = m_dataManagers.find(tag);
             return found->second.self();
         }
@@ -121,7 +129,28 @@ namespace resource
             if (has<TUserType>(data))
                 return false;
             const auto identifier = data->getIdentifier();
+            const std::lock_guard<std::mutex> lock(m_mutex);
             m_registry.emplace(identifier, Wrapped{util::HandleHelper::unpack(identifier), identifier, data});
+            return true;
+        }
+
+        template <typename TUserType>
+        bool remove(TUserType *data)
+        {
+            if (!has<TUserType>(data))
+                return false;
+            const auto identifier = data->getIdentifier();
+            const std::lock_guard<std::mutex> lock(m_mutex);
+            m_registry.erase(identifier);
+            return true;
+        }
+
+        bool remove(uint64_t identifier)
+        {
+            if (!has(identifier))
+                return false;
+            const std::lock_guard<std::mutex> lock(m_mutex);
+            m_registry.erase(identifier);
             return true;
         }
 
@@ -133,9 +162,12 @@ namespace resource
         {
             using data_type = std::remove_pointer_t<TUserType>;
             data_type *found = nullptr;
-            auto it = m_registry.find(identifier);
-            if (it != m_registry.end())
-                found = static_cast<data_type *>(it->second.pointer);
+            {
+                const std::lock_guard<std::mutex> lock(m_mutex);
+                auto it = m_registry.find(identifier);
+                if (it != m_registry.end())
+                    found = reinterpret_cast<data_type *>(it->second.pointer);
+            }
             if (!found)
                 found = this->dereference<data_type>(identifier);
             return found;
@@ -145,25 +177,34 @@ namespace resource
         bool has(TUserType *data)
         {
             const auto identifier = data->getIdentifier();
-            auto inRegistry = m_registry.find(identifier) != m_registry.end();
-            if (inRegistry)
-                return true;
+            {
+                const std::lock_guard<std::mutex> lock(m_mutex);
+                auto inRegistry = m_registry.find(identifier) != m_registry.end();
+                if (inRegistry)
+                    return true;
+            }
             return this->dereference<void>(identifier) != nullptr;
         }
 
         bool has(uint64_t identifier)
         {
-            auto inRegistry = m_registry.find(identifier) != m_registry.end();
-            if (inRegistry)
-                return true;
+            {
+                const std::lock_guard<std::mutex> lock(m_mutex);
+                auto inRegistry = m_registry.find(identifier) != m_registry.end();
+                if (inRegistry)
+                    return true;
+            }
             return this->dereference<void>(identifier) != nullptr;
         }
 
         bool has(const util::HandleBase &handle)
         {
-            auto inRegistry = m_registry.find(handle.getHandle()) != m_registry.end();
-            if (inRegistry)
-                return true;
+            {
+                const std::lock_guard<std::mutex> lock(m_mutex);
+                auto inRegistry = m_registry.find(handle.getHandle()) != m_registry.end();
+                if (inRegistry)
+                    return true;
+            }
             return this->dereference<void>(handle.getHandle()) != nullptr;
         }
 
@@ -174,15 +215,19 @@ namespace resource
 
         bool has(util::NamedHandle &nameTag)
         {
-            auto inRegistry = m_registry.find(nameTag.getHandle()) != m_registry.end();
-            if (inRegistry)
-                return true;
+            {
+                const std::lock_guard<std::mutex> lock(m_mutex);
+                auto inRegistry = m_registry.find(nameTag.getHandle()) != m_registry.end();
+                if (inRegistry)
+                    return true;
+            }
             return this->dereference<void>(nameTag) != nullptr;
         }
 
     protected:
         DataManagersMap m_dataManagers;
         RegistryMap m_registry;
+        mutable std::mutex m_mutex;
     }; //# class GlobalObjectRegistry
 } //> namespace resource
 

@@ -7,7 +7,7 @@ class EngineMain;
 template <typename TEngineType>
 class Application
 {
-    static_assert(std::is_base_of<EngineMain, TEngineType>::value,
+    static_assert(std::is_base_of_v<EngineMain, TEngineType>,
                   "TEngineType template parameter type needs to be derived from EngineMain");
 
 public:
