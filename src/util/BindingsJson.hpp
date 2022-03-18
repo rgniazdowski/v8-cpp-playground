@@ -98,7 +98,7 @@ namespace util
             else if (type == WrappedValue::BOOL)
                 output.set<bool>(static_cast<bool>(_value));
         }
-    };
+    }; //# struct json_helper
     //#-----------------------------------------------------------------------------------
 
     void to_json(json &output, const WrappedValue &input)
@@ -140,7 +140,7 @@ namespace util
                 if (external.contains("handle"))
                 {
                     external.at("handle").get_to(handle);
-                    output = WrappedValue(typeName.c_str(), nullptr, handle);
+                    output = WrappedValue(typeName.c_str(), nullptr, handle, 0);
                 }
             }
         }
@@ -186,7 +186,7 @@ namespace util
     } //# from_json WrappedValue
     //#-----------------------------------------------------------------------------------
 
-    void to_json(json &output, const WrappedValue::Args &input)
+    void to_json(json &output, const WrappedArgs &input)
     {
         output = json::array(); // force array type ?
         for (auto &arg : input)
@@ -194,10 +194,10 @@ namespace util
             const WrappedValue &value = *arg;
             output.push_back(value); // append to array
         }
-    } //# to_json WrappedValue::Args
+    } //# to_json WrappedArgs
     //#-----------------------------------------------------------------------------------
 
-    void from_json(const json &input, WrappedValue::Args &output)
+    void from_json(const json &input, WrappedArgs &output)
     {
         if (!input.is_array())
             return; // cannot do anything without an array
@@ -207,7 +207,7 @@ namespace util
             from_json(element, *pWrapped);
             output.push_back(pWrapped);
         }
-    } //# from_json WrappedValue::Args
+    } //# from_json WrappedArgs
     //#-----------------------------------------------------------------------------------
 
     void to_json(json &output, const WrappedAction &input)

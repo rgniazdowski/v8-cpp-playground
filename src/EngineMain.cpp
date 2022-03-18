@@ -14,7 +14,8 @@
 #include <event/EventManager.hpp>
 #include <Unistd.hpp>
 
-EngineMain::EngineMain(int argc, char **argv) : m_argc(argc),
+EngineMain::EngineMain(int argc, char **argv) : base_type(),
+                                                m_argc(argc),
                                                 m_argv(argv),
                                                 m_resourceMgr(nullptr)
 {
@@ -59,6 +60,8 @@ bool EngineMain::closeSybsystems(void)
 
 bool EngineMain::destroy(void)
 {
+    if (!isInit())
+        return false;
     logger::debug("Game main quit requested");
     executeEvent(event::Type::ProgramQuit);
     this->update(true);
@@ -80,6 +83,8 @@ void EngineMain::setEventManager(void)
 
 bool EngineMain::initialize(void)
 {
+    if (isInit())
+        return true;
     if (!m_resourceMgr)
         m_resourceMgr = new resource::ResourceManager(this);
     m_resourceMgr->setMaximumMemory(128 * 1024 * 1024 - 1024 * 1024 * 10); // #FIXME #TODO

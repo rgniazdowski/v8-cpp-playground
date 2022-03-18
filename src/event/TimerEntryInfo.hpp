@@ -9,7 +9,7 @@ namespace event
 {
     struct TimerHelper;
 
-    using WrappedArgs = std::vector<::util::WrappedValue *>;
+    using WrappedArgs = ::util::WrappedArgs;
 
     struct TimerEntryInfo
     {

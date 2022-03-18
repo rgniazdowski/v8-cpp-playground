@@ -14,12 +14,12 @@ namespace event
     struct ThrownEvent
     {
         Type eventCode;
-        util::WrappedValue::Args args;
+        util::WrappedArgs args;
 
         ThrownEvent() : eventCode(Type::Invalid), args() {}
 
-        ThrownEvent(Type _eventCode, util::WrappedValue::Args &_args) : eventCode(_eventCode),
-                                                                        args(std::move(_args)) {}
+        ThrownEvent(Type _eventCode, util::WrappedArgs &_args) : eventCode(_eventCode),
+                                                                 args(std::move(_args)) {}
 
         ThrownEvent(const ThrownEvent &other) = delete;
         ThrownEvent &operator=(const ThrownEvent &other) = delete;

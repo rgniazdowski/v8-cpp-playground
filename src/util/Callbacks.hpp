@@ -28,10 +28,10 @@ namespace util
         Callback(Callback &&other) noexcept : m_binding(std::move(other.m_binding)), m_type(other.m_type) { other.m_type = 0; }
 
     public:
-        virtual ~Callback() { m_type = CALLBACK_INVALID; }
+        ~Callback() { m_type = CALLBACK_INVALID; }
 
         virtual bool operator()(void) const = 0;
-        virtual bool operator()(const WrappedValue::Args &args) const = 0;
+        virtual bool operator()(const WrappedArgs &args) const = 0;
 
         inline CallbackType getType(void) const { return m_type; }
 
@@ -39,7 +39,7 @@ namespace util
     }; //# class Callback
     //#-----------------------------------------------------------------------------------
 
-    class FunctionCallback : public virtual Callback
+    class FunctionCallback : public Callback
     {
     public:
         using base_type = Callback;
@@ -79,10 +79,10 @@ namespace util
         {
             if (!m_binding)
                 return false;
-            return !!BindingHelper::callWrapped((void *)nullptr, m_binding.get(), WrappedValue::Args());
+            return !!BindingHelper::callWrapped((void *)nullptr, m_binding.get(), WrappedArgs());
         }
 
-        virtual bool operator()(const WrappedValue::Args &args) const
+        virtual bool operator()(const WrappedArgs &args) const
         {
             if (!m_binding)
                 return false;
@@ -106,7 +106,7 @@ namespace util
     //#-----------------------------------------------------------------------------------
 
     template <typename UserClass>
-    class MethodCallback : public virtual Callback
+    class MethodCallback : public Callback
     {
     public:
         using base_type = Callback;
@@ -144,10 +144,10 @@ namespace util
         {
             if (!m_binding || !m_pObject)
                 return false;
-            return !!BindingHelper::callWrapped(m_pObject, m_binding.get(), WrappedValue::Args());
+            return !!BindingHelper::callWrapped(m_pObject, m_binding.get(), WrappedArgs());
         }
 
-        virtual bool operator()(const WrappedValue::Args &args) const
+        virtual bool operator()(const WrappedArgs &args) const
         {
             if (!m_binding || !m_pObject)
                 return false;
