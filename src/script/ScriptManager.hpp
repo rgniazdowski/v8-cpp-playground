@@ -115,6 +115,7 @@ namespace script
             }
         }; //# struct PendingCallback
         std::stack<PendingCallback> m_pendingCallbacks;
+        std::mutex m_mutex;
     }; //# class ScriptManager
 
 } //> namespace script
