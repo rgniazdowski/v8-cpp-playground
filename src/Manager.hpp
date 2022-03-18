@@ -6,10 +6,11 @@
 
 #include <Singleton.hpp>
 #include <util/Handle.hpp>
+#include <util/SimpleThread.hpp>
 
 namespace base
 {
-    class ManagerBase : public util::ObjectWithIdentifier
+    class ManagerBase : public util::ObjectWithIdentifier, protected util::SimpleThread
     {
     protected:
         inline static uint8_t s_gid = 0;
@@ -23,8 +24,19 @@ namespace base
 
         ManagerBase(uint32_t managerId = 0, uint64_t identifier = 0) : m_init(false),
                                                                        m_managerId(managerId),
-                                                                       m_instanceId(identifier) {}
-        virtual ~ManagerBase() {}
+                                                                       m_instanceId(identifier),
+                                                                       m_thread(*this) {}
+        virtual ~ManagerBase() { stopThread(); }
+
+        inline bool startThread(void) { return this->start(); }
+        inline bool signalThread(void) { return this->wakeup(); }
+        inline bool joinThread(void) { return this->join(); }
+        inline void stopThread(void) { this->stop(); }
+
+        using util::SimpleThread::isJoinable;
+        using util::SimpleThread::isRunning;
+        using util::SimpleThread::isWakeable;
+
         ManagerBase(const ManagerBase &other) = delete;
         ManagerBase(ManagerBase &&other) = delete;
         ManagerBase &operator=(const ManagerBase &other) = delete;
@@ -34,11 +46,13 @@ namespace base
 
     protected:
         bool m_init;
+        util::SimpleThread &m_thread;
 
     private:
         uint32_t m_managerId;
         uint64_t m_instanceId;
     }; //# class ManagerBase
+    //#-----------------------------------------------------------------------------------
 
     template <class TManagerType>
     class Manager : virtual protected ManagerBase
@@ -53,6 +67,15 @@ namespace base
     public:
         Manager() : ManagerBase(self_type::id(), self_type::aquireInstanceId()) {}
         virtual ~Manager() {}
+
+        using ManagerBase::joinThread;
+        using ManagerBase::signalThread;
+        using ManagerBase::startThread;
+        using ManagerBase::stopThread;
+
+        using ManagerBase::isJoinable;
+        using ManagerBase::isRunning;
+        using ManagerBase::isWakeable;
 
         /**
          * @brief Acquire and retrieve unique identifier for a given manager type (Manager Id),
@@ -72,6 +95,7 @@ namespace base
         inline static bool s_idset = false;
         inline static uint8_t s_lid = 0;
     }; //# class Manager
+    //#-----------------------------------------------------------------------------------
 
     class ManagerRegistry : public fg::Singleton<ManagerRegistry>
     {
@@ -152,10 +176,36 @@ namespace base
             return m_registry.find(managerId) != m_registry.end();
         }
 
+        bool isJoinable(uint32_t managerId) const
+        {
+            auto manager = get<ManagerBase>(managerId);
+            if (!manager)
+                return false;
+            return manager->isJoinable();
+        }
+
+        bool isRunning(uint32_t managerId) const
+        {
+            auto manager = get<ManagerBase>(managerId);
+            if (!manager)
+                return false;
+            return manager->isRunning();
+        }
+
+        bool isWakeable(uint32_t managerId) const
+        {
+            auto manager = get<ManagerBase>(managerId);
+            if (!manager)
+                return false;
+            return manager->isWakeable();
+        }
+
     protected:
         RegistryMap m_registry;
         mutable std::mutex m_mutex;
     }; //# class ManagerRegistry
+    //#-----------------------------------------------------------------------------------
+
 } //> namespace base
 
 #endif //> FG_INC_MANAGER
