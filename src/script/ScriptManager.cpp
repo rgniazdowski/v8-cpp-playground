@@ -101,14 +101,12 @@ bool script::ScriptManager::scriptCallbackHandler(const util::WrappedArgs &args)
     // After that, it'll be possible to queue this call so it's executed in script thread.
     // Script callback handler for sure is executed from one of the dedicated event threads.
     //
-    util::WrappedArgs _args(args); // shallow copy
-    // auto backcopy = _args.back();
-    _args.pop_back(); // remove the last item (external to callback)
-    // delete backcopy;  // this is a complete duplicate - release it
-    //  arguments are copied over! (full duplication) in PendingCallback constructor
+    // Arguments are copied over! (full duplication) in PendingCallback constructor
+    // This includes also the extra ScriptCallback external, which will be skipped because
+    // of the extra parameter that shows a lower number of input arguments for the event.
     {
         const std::lock_guard<std::recursive_mutex> lock(m_mutex);
-        m_pendingCallbacks.emplace(_args, callback);
+        m_pendingCallbacks.emplace(args, callback, (int)(args.size() - 1));
     }
     m_thread.wakeup(); // signal the thread because there are new callbacks pending
     return true;
@@ -125,29 +123,31 @@ void script::ScriptManager::processPendingCallbacks(void)
         lock.lock();
         if (m_pendingCallbacks.empty())
             break;
-        auto &top = m_pendingCallbacks.top();
-        auto callback = top.callback;
-        auto &args = top.args;
-        if (callback->isFunction())
+        // move to new structure, will call destructor on next loop, releasing copied args vector
+        PendingCallback top(std::move(m_pendingCallbacks.top()));
+        m_pendingCallbacks.pop();
+        // unlock so callback execution can actually add more pending callbacks on next loop
+        lock.unlock();
+        if (top.callback->isFunction())
         {
-            auto function = callback->m_nativeFunction.Get(m_isolate);
+            auto function = top.callback->m_nativeFunction.Get(m_isolate);
             v8::TryCatch tryCatch(m_isolate);
             // convert wrapped args into an array of local values to be used as inputs to JS function
             // it requires a map/array of converters because type information is lost when values is wrapped
             util::WrappedArgs registeredArgs; // any external pointers that have been registered with V8 are placed here - these are temporary
-            std::unique_ptr<LocalValue> argv(argsToPointer(m_isolate, args, registeredArgs));
+            std::unique_ptr<LocalValue> argv(argsToPointer(m_isolate, top.args, registeredArgs, top.numArgs));
             // need to figure out if using 'this' as global is ok, or can it be undefined
-            auto result = function->Call(context, context->Global(), static_cast<int>(args.size()), argv.get());
+            auto result = function->Call(context, context->Global(), static_cast<int>(top.args.size()), argv.get());
             unregisterArgs(m_isolate, registeredArgs); // release any temporary objects from V8 - any handles will be invalidated
             if (result.IsEmpty())
             {
                 auto ex = tryCatch.Exception();
             }
         }
-        else if (callback->isScriptEval())
+        else if (top.callback->isScriptEval())
         {
             auto source =
-                v8::String::NewFromUtf8(m_isolate, callback->m_script.c_str(), v8::NewStringType::kNormal)
+                v8::String::NewFromUtf8(m_isolate, top.callback->m_script.c_str(), v8::NewStringType::kNormal)
                     .ToLocalChecked();
             v8::TryCatch tryCatch(m_isolate);
             auto maybeScript = v8::Script::Compile(context, source);
@@ -160,7 +160,6 @@ void script::ScriptManager::processPendingCallbacks(void)
                 auto ex = tryCatch.Exception();
             }
         }
-        lock.unlock();
     }
 }
 //>---------------------------------------------------------------------------------------

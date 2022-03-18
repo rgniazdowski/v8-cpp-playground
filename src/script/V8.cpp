@@ -4,11 +4,12 @@
 
 #include <unordered_map>
 
-script::LocalValue *script::argsToPointer(v8::Isolate *isolate, util::WrappedArgs const &args, util::WrappedArgs &registeredArgs)
+script::LocalValue *script::argsToPointer(v8::Isolate *isolate, util::WrappedArgs const &args, util::WrappedArgs &registeredArgs, int numArgs)
 {
-    const int argc = static_cast<int>(args.size());
-    auto argv = new LocalValue[argc];
-    for (int idx = 0; idx < argc; idx++)
+    const int argsSize = static_cast<int>(args.size());
+    const int argc = (numArgs < 0 ? argsSize : numArgs);
+    auto argv = new LocalValue[(argc > argsSize ? argsSize : argc)];
+    for (int idx = 0; idx < argc && idx < argsSize; idx++)
     {
         auto pWrapped = args[idx];
         const auto &wrapped = *pWrapped;
@@ -48,7 +49,6 @@ script::LocalValue *script::argsToPointer(v8::Isolate *isolate, util::WrappedArg
         }
         auto value = converter->convert(isolate, wrapped);
     } //# for each original argument
-
     return argv;
 }
 //>---------------------------------------------------------------------------------------

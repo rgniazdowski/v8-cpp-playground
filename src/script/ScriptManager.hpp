@@ -103,15 +103,21 @@ namespace script
         struct PendingCallback
         {
             util::WrappedArgs args;
+            int numArgs;
             ScriptCallback *callback;
-            PendingCallback(const util::WrappedArgs &_args, ScriptCallback *_callback) : args(), callback(_callback) { util::copy_arguments(_args, args); }
-            PendingCallback(const PendingCallback &other) : callback(other.callback) { util::copy_arguments(other.args, args); }
-            PendingCallback(PendingCallback &&other) : args(std::move(other.args)), callback(other.callback) { other.callback = nullptr; }
+            PendingCallback(const util::WrappedArgs &_args, ScriptCallback *_callback, int _numArgs) : args(), callback(_callback), numArgs(_numArgs) { util::copy_arguments(_args, args); }
+            PendingCallback(const PendingCallback &other) : callback(other.callback), numArgs(other.numArgs) { util::copy_arguments(other.args, args); }
+            PendingCallback(PendingCallback &&other) : args(std::move(other.args)), callback(other.callback), numArgs(other.numArgs)
+            {
+                other.callback = nullptr;
+                other.numArgs = 0;
+            }
             ~PendingCallback()
             {
                 // need to call destructors on input arguments - it's a copy
                 util::reset_arguments(args);
                 callback = nullptr;
+                numArgs = 0;
             }
         }; //# struct PendingCallback
         std::stack<PendingCallback> m_pendingCallbacks;

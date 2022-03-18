@@ -53,7 +53,7 @@ namespace script
         } //# for each original argument
         return argv;
     }
-    LocalValue *argsToPointer(v8::Isolate *isolate, util::WrappedArgs const &args, util::WrappedArgs &registeredArgs);
+    LocalValue *argsToPointer(v8::Isolate *isolate, util::WrappedArgs const &args, util::WrappedArgs &registeredArgs, int numArgs = -1);
 
     void unregisterArgs(v8::Isolate *isolate, const util::WrappedArgs &registeredArgs);
 
