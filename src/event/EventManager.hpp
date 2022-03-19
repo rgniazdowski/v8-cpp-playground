@@ -140,7 +140,11 @@ namespace event
         TimerEntryInfo *getTimer(const uint32_t id);
         TimerEntryInfo const *getTimer(const uint32_t id) const;
 
-        inline bool hasTimers(void) const { return !m_timerEntries.empty(); }
+        inline bool hasTimers(void) const
+        {
+            const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
+            return !m_timerEntries.empty();
+        }
         bool hasTimer(const uint32_t id) const;
         bool removeTimer(const uint32_t id);
         size_t removeTimers(const std::vector<uint32_t> &ids);
@@ -201,9 +205,11 @@ namespace event
         ///
         EventsPtrVec m_eventStructsFreeSlots;
         ///
-        mutable std::mutex m_mutexEvents;
+        mutable std::mutex m_mutexEventsQueue;
         ///
-        mutable std::mutex m_mutexTimers;
+        mutable std::mutex m_mutexEventBinds;
+        ///
+        mutable std::recursive_mutex m_mutexTimers;
     }; //# class EventManager
 
     template <typename UserClass, typename ReturnType, typename... Args>
@@ -233,6 +239,7 @@ namespace event
     {
         if (eventCode == Type::Invalid || !methodMember)
             return nullptr;
+        const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
         auto found = m_eventBinds.find(eventCode);
         if (found == m_eventBinds.end())
             return nullptr;
@@ -256,6 +263,7 @@ namespace event
     {
         if (eventCode == Type::Invalid || !function)
             return nullptr;
+        const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
         auto found = m_eventBinds.find(eventCode);
         if (found == m_eventBinds.end())
             return nullptr;
@@ -274,6 +282,7 @@ namespace event
     {
         if (eventCode == Type::Invalid || !pObject)
             return nullptr;
+        const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
         auto found = m_eventBinds.find(eventCode);
         if (found == m_eventBinds.end())
             return nullptr;
@@ -293,6 +302,7 @@ namespace event
     {
         if (!methodMember)
             return Type::Invalid;
+        const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
         Type foundEvent = Type::Invalid;
         for (auto &it : m_eventBinds)
         {
@@ -320,6 +330,7 @@ namespace event
     {
         if (!function)
             return Type::Invalid;
+        const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
         Type foundEvent = Type::Invalid;
         for (auto &it : m_eventBinds)
         {
@@ -342,6 +353,7 @@ namespace event
     {
         if (!pObject)
             return Type::Invalid;
+        const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
         Type foundEvent = Type::Invalid;
         for (auto &it : m_eventBinds)
         {
@@ -363,6 +375,7 @@ namespace event
     uint32_t EventManager::addTimeout(const int timeout, ReturnType (*function)(Args...),
                                       WrappedArgs &args, const std::initializer_list<std::string> &argNames)
     {
+        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
         m_timerEntries.emplace(std::move(TimerHelper::function<TimerEntryInfo::TIMEOUT, ReturnType, Args...>(timeout, function, argNames).setArgs(std::move(args))));
         return m_timerEntries.back().getId();
     }
@@ -374,6 +387,7 @@ namespace event
                                       WrappedArgs &args,
                                       const std::initializer_list<std::string> &argNames)
     {
+        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
         m_timerEntries.emplace(std::move(TimerHelper::method<TimerEntryInfo::TIMEOUT, UserClass, ReturnType, Args...>(timeout, pObject, methodMember, argNames).setArgs(std::move(args))));
         return m_timerEntries.back().getId();
     }
@@ -384,6 +398,7 @@ namespace event
                                        const int repeats, WrappedArgs &args,
                                        const std::initializer_list<std::string> &argNames)
     {
+        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
         m_timerEntries.emplace(std::move(TimerHelper::function<TimerEntryInfo::INTERVAL, ReturnType, Args...>(interval, function, repeats, argNames).setArgs(std::move(args))));
         return m_timerEntries.back().getId();
     }
@@ -395,6 +410,7 @@ namespace event
                                        const int repeats, WrappedArgs &args,
                                        const std::initializer_list<std::string> &argNames)
     {
+        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
         m_timerEntries.emplace(std::move(TimerHelper::method<TimerEntryInfo::INTERVAL, UserClass, ReturnType, Args...>(interval, pObject, methodMember, repeats, argNames).setArgs(std::move(args))));
         return m_timerEntries.back().getId();
     }

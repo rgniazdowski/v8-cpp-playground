@@ -10,6 +10,7 @@ event::EventManager::EventManager() : base_type(),
                                       m_eventStructs(),
                                       m_eventStructsFreeSlots()
 {
+    m_thread.setThreadName("EventManager");
 }
 //>---------------------------------------------------------------------------------------
 
@@ -44,30 +45,42 @@ void event::EventManager::resetArguments(WrappedArgs &args)
 
 bool event::EventManager::destroy(void)
 {
-    for (auto &it : m_eventBinds)
-        this->deleteCallbacks(it.first);
-    while (!m_eventsQueue.empty())
-    {
-        resetArguments(m_eventsQueue.front().args);
-        m_eventsQueue.pop();
+    /* mutex events queue */ {
+        const std::lock_guard<std::mutex> lock(m_mutexEventsQueue);
+        while (!m_eventsQueue.empty())
+        {
+            resetArguments(m_eventsQueue.front().args);
+            m_eventsQueue.pop();
+        }
+        m_eventsQueue.clear();
     }
-    for (auto &timer : m_timerEntries)
-    {
-        resetArguments(timer.args); // cleanup arguments (just in case)
-        timer.deactivate();         // mark for removal
+    /* mutex event binds */ {
+        const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
+        m_eventStructsFreeSlots.clear();
+        while (m_eventStructs.size())
+        {
+            EventCombined *ptr = m_eventStructs.back();
+            delete ptr;
+            m_eventStructs.pop_back();
+        } //# for each event structure
+        for (auto &it : m_eventBinds)
+            this->deleteCallbacks(it.first);
+        m_eventBinds.clear();
+        m_eventStructs.clear();
     }
-    m_eventStructsFreeSlots.clear();
-    while (m_eventStructs.size())
-    {
-        EventCombined *ptr = m_eventStructs.back();
-        delete ptr;
-        m_eventStructs.pop_back();
-    } //# for each event structure
-    m_eventBinds.clear();
+    /* mutex timers */ {
+        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
+        for (auto &timer : m_timerEntries)
+        {
+            resetArguments(timer.args); // cleanup arguments (just in case)
+            timer.deactivate();         // mark for removal
+        }
+    }
     removeInactiveTimers();
-    m_timerEntries.clear();
-    m_eventsQueue.clear();
-    m_eventStructs.clear();
+    /* mutex timers */ {
+        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
+        m_timerEntries.clear();
+    }
     m_init = false; // mark as deinitialized
     m_cleanupIntervalId = 0;
     return true;
@@ -106,6 +119,7 @@ event::EventBase *event::EventManager::requestEventStruct(Type eventType)
 
 event::ThrownEvent &event::EventManager::throwEvent(Type eventCode, WrappedArgs &args)
 {
+    const std::lock_guard<std::mutex> lock(m_mutexEventsQueue);
     m_eventsQueue.emplace(ThrownEvent(eventCode, args));
     return m_eventsQueue.back();
 }
@@ -115,6 +129,7 @@ bool event::EventManager::isRegistered(Type eventCode, util::Callback *pCallback
 {
     if (eventCode == event::Type::Invalid || !pCallback)
         return false;
+    const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
     auto found = m_eventBinds.find(eventCode);
     if (found == m_eventBinds.end())
         return false;
@@ -126,6 +141,7 @@ event::Type event::EventManager::isRegistered(util::Callback *pCallback)
 {
     if (!pCallback)
         return event::Type::Invalid;
+    const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
     Type foundEvent = event::Type::Invalid;
     for (auto &it : m_eventBinds)
     {
@@ -141,11 +157,15 @@ event::Type event::EventManager::isRegistered(util::Callback *pCallback)
 
 unsigned int event::EventManager::executeEvent(Type eventCode)
 {
+    CallbacksVec callbacks;
     unsigned int count = 0;
-    auto found = m_eventBinds.find(eventCode);
-    if (found == m_eventBinds.end())
-        return 0;
-    const auto &callbacks = (*found).second;
+    {
+        const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
+        auto found = m_eventBinds.find(eventCode);
+        if (found == m_eventBinds.end())
+            return 0;
+        callbacks = (*found).second; // copy vec
+    }
     for (auto callback : callbacks)
     {
         if (!callback)
@@ -159,11 +179,15 @@ unsigned int event::EventManager::executeEvent(Type eventCode)
 
 unsigned int event::EventManager::executeEvent(ThrownEvent &thrownEvent)
 {
+    CallbacksVec callbacks;
     unsigned int count = 0;
-    auto found = m_eventBinds.find(thrownEvent.eventCode);
-    if (found == m_eventBinds.end())
-        return 0;
-    auto &callbacks = (*found).second;
+    {
+        const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
+        auto found = m_eventBinds.find(thrownEvent.eventCode);
+        if (found == m_eventBinds.end())
+            return 0;
+        callbacks = (*found).second;
+    }
     for (auto callback : callbacks)
     {
         if (!callback)
@@ -185,11 +209,15 @@ unsigned int event::EventManager::executeEvent(ThrownEvent &thrownEvent)
 
 unsigned int event::EventManager::executeEvent(Type eventCode, WrappedArgs &args)
 {
+    CallbacksVec callbacks;
     unsigned int count = 0;
-    auto found = m_eventBinds.find(eventCode);
-    if (found == m_eventBinds.end())
-        return 0;
-    auto &callbacks = (*found).second;
+    {
+        const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
+        auto found = m_eventBinds.find(eventCode);
+        if (found == m_eventBinds.end())
+            return 0;
+        callbacks = (*found).second; // create a copy for calling functions
+    }
     for (auto callback : callbacks)
     {
         if (!callback)
@@ -210,9 +238,12 @@ util::Callback *event::EventManager::addCallback(Type eventCode, util::Callback 
     if (!pCallback || (int)eventCode < 0)
         return nullptr;
     // Duplicate callbacks are not allowed for the same event (avoid double trigger)
-    if (isRegistered(eventCode, pCallback))
+    if (isRegistered(eventCode, pCallback)) //! Lock - event binds
         return nullptr;
-    m_eventBinds[eventCode].push_back(pCallback);
+    {
+        const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
+        m_eventBinds[eventCode].push_back(pCallback);
+    }
     return pCallback;
 } //> addCallback(...)
 //>---------------------------------------------------------------------------------------
@@ -221,6 +252,7 @@ bool event::EventManager::removeCallback(Type eventCode, util::Callback *pCallba
 {
     if (!pCallback || (int)eventCode < 0)
         return false;
+    const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
     auto &callbacksVec = m_eventBinds[eventCode];
     if (callbacksVec.empty())
         return false;
@@ -242,6 +274,7 @@ event::CallbacksVec event::EventManager::removeCallbacks(Type eventCode)
 {
     if ((int)eventCode < 0)
         return event::CallbacksVec();
+    const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
     auto &callbacksVec = m_eventBinds[eventCode];
     if (callbacksVec.empty())
         return event::CallbacksVec();
@@ -261,6 +294,7 @@ bool event::EventManager::deleteCallback(Type eventCode, util::Callback *&pCallb
 {
     if (!pCallback || (int)eventCode < 0)
         return false;
+    const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
     auto &callbacksVec = m_eventBinds[eventCode];
     if (callbacksVec.empty())
         return false;
@@ -284,6 +318,7 @@ size_t event::EventManager::deleteCallbacks(Type eventCode)
 {
     if ((int)eventCode < 0)
         return 0;
+    const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
     auto &callbacksVec = m_eventBinds[eventCode];
     if (callbacksVec.empty())
         return 0;
@@ -302,11 +337,11 @@ size_t event::EventManager::deleteCallbacks(Type eventCode)
 } //> deleteCallbacks(...)
 //>---------------------------------------------------------------------------------------
 
-uint32_t event::EventManager::addTimeout(util::Callback *pCallback,
-                                         const int timeout, WrappedArgs &args)
+uint32_t event::EventManager::addTimeout(util::Callback *pCallback, const int timeout, WrappedArgs &args)
 {
     if (!pCallback)
         return 0;
+    const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
     TimerEntryInfo timer(TimerEntryInfo::autoid(), 1, timeout, pCallback);
     if (args.size() > 0)
         timer.setArgs(std::move(args));
@@ -317,6 +352,7 @@ uint32_t event::EventManager::addTimeout(util::Callback *pCallback,
 
 event::TimerEntryInfo *event::EventManager::getTimer(const uint32_t id)
 {
+    const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
     for (auto &it : m_timerEntries)
         if (it.getId() == id)
             return &it;
@@ -326,6 +362,7 @@ event::TimerEntryInfo *event::EventManager::getTimer(const uint32_t id)
 
 event::TimerEntryInfo const *event::EventManager::getTimer(const uint32_t id) const
 {
+    const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
     for (const auto &it : m_timerEntries)
         if (it.getId() == id)
             return &it;
@@ -335,6 +372,7 @@ event::TimerEntryInfo const *event::EventManager::getTimer(const uint32_t id) co
 
 bool event::EventManager::hasTimer(const uint32_t id) const
 {
+    const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
     for (const auto &it : m_timerEntries)
     {
         if (it.getId() == id)
@@ -346,16 +384,19 @@ bool event::EventManager::hasTimer(const uint32_t id) const
 
 bool event::EventManager::removeTimer(const uint32_t id)
 {
-    if (!hasTimer(id))
+    if (!hasTimer(id)) //! Lock - timers
         return false;
     TimerEntries output;
     // need to go over every entry and emplace it back to the new queue if it's different
-    for (auto &it : m_timerEntries)
     {
-        if (it.getId() != id)
-            output.emplace(std::move(it));
+        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
+        for (auto &it : m_timerEntries)
+        {
+            if (it.getId() != id)
+                output.emplace(std::move(it));
+        }
+        std::swap(output, m_timerEntries);
     }
-    std::swap(output, m_timerEntries);
     return true;
 } //> removeTimer(...)
 //>---------------------------------------------------------------------------------------
@@ -367,20 +408,23 @@ size_t event::EventManager::removeTimers(const std::vector<uint32_t> &ids)
     size_t cnt = 0;
     for (auto &id : ids)
     {
-        if (hasTimer(id))
+        if (hasTimer(id)) //! Lock - timers
             cnt++;
     }
     if (!cnt)
         return 0;
     TimerEntries output;
     // need to go over every entry and emplace it back to the new queue if it's different
-    for (auto &it : m_timerEntries)
     {
-        auto id = it.getId();
-        if (util::find(ids, id) < 0)
-            output.emplace(std::move(it));
+        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
+        for (auto &it : m_timerEntries)
+        {
+            auto id = it.getId();
+            if (util::find(ids, id) < 0)
+                output.emplace(std::move(it));
+        }
+        std::swap(output, m_timerEntries);
     }
-    std::swap(output, m_timerEntries);
     return cnt;
 } //> removeTimers(...)
 //>---------------------------------------------------------------------------------------
@@ -388,10 +432,13 @@ size_t event::EventManager::removeTimers(const std::vector<uint32_t> &ids)
 size_t event::EventManager::removeInactiveTimers(void)
 {
     std::vector<uint32_t> ids;
-    for (const auto &it : m_timerEntries)
     {
-        if (it.isInactive())
-            ids.push_back(it.getId());
+        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
+        for (const auto &it : m_timerEntries)
+        {
+            if (it.isInactive())
+                ids.push_back(it.getId());
+        }
     }
     return removeTimers(ids);
 } //> removeInactiveTimers(...)
@@ -399,15 +446,23 @@ size_t event::EventManager::removeInactiveTimers(void)
 
 bool event::EventManager::removeTimer(const util::Callback *pCallback)
 {
-    for (const auto &it : m_timerEntries)
-    {
-        if (it.checkCallback(pCallback))
+    bool found = false;
+    uint32_t id = 0;
+    /* lock mutex timers */ {
+        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
+        for (const auto &it : m_timerEntries)
         {
-            removeTimer(it.getId());
-            return true;
+            if (it.checkCallback(pCallback))
+            {
+                id = it.getId();
+                found = true;
+                break;
+            }
         }
     }
-    return false;
+    if (found)
+        removeTimer(id);
+    return found;
 } //> removeTimer(...)
 //>---------------------------------------------------------------------------------------
 
@@ -416,6 +471,7 @@ uint32_t event::EventManager::addInterval(const int interval, util::Callback *pC
 {
     if (!pCallback)
         return 0;
+    const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
     TimerEntryInfo timer(TimerEntryInfo::autoid(), repeats, interval, pCallback);
     if (args.size() > 0)
         timer.setArgs(std::move(args));
@@ -426,6 +482,7 @@ uint32_t event::EventManager::addInterval(const int interval, util::Callback *pC
 
 void event::EventManager::processTimers(void)
 {
+    const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
     //#-----------------------------------------------------------------------------------
     //# Phase 1: Intervals & timeouts - universal
     const auto timeStamp = timesys::ticks();
@@ -450,20 +507,27 @@ void event::EventManager::processTimers(void)
 
 void event::EventManager::processEvents(void)
 {
+    EventsQueue queue;
+    {
+        // using mutex and move to another (local) queue in order to avoid recursive lock on queue
+        // if new event is thrown while executing given event
+        const std::lock_guard<std::mutex> lock(m_mutexEventsQueue);
+        queue = std::move(m_eventsQueue); // pending queue is now empty
+    }
     //#-----------------------------------------------------------------------------------
     //# Phase 2: execution of thrown events (now including the argument list).
-    while (!m_eventsQueue.empty())
+    while (!queue.empty())
     {
         // this will also cleanup the allocated argument list that's associated with thrown event
-        executeEvent(m_eventsQueue.front());
-        m_eventsQueue.pop();
-    } //> for each event on queue
+        executeEvent(queue.front()); //! Lock - event binds
+        queue.pop();
+    } //> for each event on queue (snapshot)
 } //> processEvents(...)
 //>---------------------------------------------------------------------------------------
 
 void event::EventManager::processEventsAndTimers(void)
 {
-    processTimers();
-    processEvents();
+    processTimers(); //! Lock - timers
+    processEvents(); //! Lock - events queue - event binds
 } //> executeEvents(...)
 //>---------------------------------------------------------------------------------------
