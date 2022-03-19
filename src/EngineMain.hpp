@@ -5,6 +5,7 @@
 #include <BuildConfig.hpp>
 #include <util/Callbacks.hpp>
 #include <util/Logger.hpp>
+#include <util/FpsControl.hpp>
 #include <event/EventManager.hpp>
 
 namespace resource
@@ -12,15 +13,18 @@ namespace resource
     class ResourceManager;
 }
 
+namespace script 
+{
+    class ScriptManager;
+}
+
 class EngineMain : public event::EventManager
 {
 public:
     using self_type = EngineMain;
     using base_type = event::EventManager;
-
-private:
     using tag_type = util::Tag<self_type>;
-    using logger = logger::Logger<tag_type>;
+    using logger = ::logger::Logger<tag_type>;
 
 public:
     EngineMain(int argc, char **argv);
@@ -32,14 +36,13 @@ public:
     bool loadConfiguration(void);
     bool loadResources(void);
 
-    bool releaseResources(void);
-    bool closeSybsystems(void);
-
     virtual bool destroy(void);
 
-    bool quit(void) { return this->destroy(); }
+    bool update();
 
-    bool update(bool force = false);
+protected:
+    bool releaseResources(void);
+    bool closeSybsystems(void);
 
 public:
     inline resource::ResourceManager *getResourceManager(void) const { return m_resourceMgr; }
@@ -53,10 +56,12 @@ private:
     int m_argc;
     /// Array of arguments passed to program
     char **m_argv;
-    /// Main Resource Manager
+    ///
+    util::FpsControl m_frameControl;
+    /// Main Resource Manager, initialized manually
     resource::ResourceManager *m_resourceMgr;
     /// Builtin script subsystem - it needs access to all main managers
-    // script::CScriptSubsystem* m_scriptSubsystem;
+    script::ScriptManager* m_scriptMgr;
 }; //> class EngineMain
 
 #endif //> FG_INC_ENGINE_MAIN

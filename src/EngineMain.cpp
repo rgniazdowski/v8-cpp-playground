@@ -10,6 +10,9 @@
 #include <util/Profiling.hpp>
 /// Resource management
 #include <resource/ResourceManager.hpp>
+/// Script management
+#include <script/ScriptManager.hpp>
+#include <script/ScriptCallback.hpp>
 /// Event management
 #include <event/EventManager.hpp>
 #include <Unistd.hpp>
@@ -17,19 +20,29 @@
 EngineMain::EngineMain(int argc, char **argv) : base_type(),
                                                 m_argc(argc),
                                                 m_argv(argv),
+                                                m_frameControl(60, 1000),
                                                 m_resourceMgr(nullptr)
 {
-    if (!base_type::initialize())
-    {
-    }
+    base_type::initialize();
     srand((unsigned int)time(nullptr));
     this->setEventManager();
     m_init = false;
+    // Setting up the main thread for processing events
+    m_thread.setFunction([this]()
+                         {
+        this->m_frameControl.process(true, this, &EngineMain::update);
+        return true; });
+    m_thread.setWakeable(false);
+    base::ManagerRegistry::instance()->add(this); // Event Manager
+    m_thread.setThreadName("EngineMain");
 }
 //>---------------------------------------------------------------------------------------
 
 EngineMain::~EngineMain()
 {
+    logger::debug("Engine final memory cleanup...");
+    script::ScriptManager::deleteInstance();
+    m_scriptMgr = nullptr;
     if (m_resourceMgr)
     {
         logger::debug("Destroying the Resource Manager...");
@@ -62,9 +75,9 @@ bool EngineMain::destroy(void)
 {
     if (!isInit())
         return false;
-    logger::debug("Game main quit requested");
+    logger::debug("Destroying the main Engine object...");
     executeEvent(event::Type::ProgramQuit);
-    this->update(true);
+    this->update();
     bool status = true;
     if (!releaseResources())
         status = false;
@@ -89,8 +102,15 @@ bool EngineMain::initialize(void)
         m_resourceMgr = new resource::ResourceManager(this);
     m_resourceMgr->setMaximumMemory(128 * 1024 * 1024 - 1024 * 1024 * 10); // #FIXME #TODO
     m_resourceMgr->initialize();
+    m_scriptMgr = script::ScriptManager::instance(m_argv);
+    m_scriptMgr->initialize();
     setEventManager();
     m_init = true;
+    this->startThread();
+    m_resourceMgr->startThread();
+    m_scriptMgr->startThread();
+    base::ManagerRegistry::instance()->add(m_resourceMgr); // Resource Manager
+    base::ManagerRegistry::instance()->add(m_scriptMgr);   // Script Manager
     return true;
 }
 //>---------------------------------------------------------------------------------------
@@ -106,53 +126,19 @@ bool EngineMain::loadConfiguration(void)
 bool EngineMain::loadResources(void)
 {
     auto t1 = timesys::ms();
-    this->update(true);
+    this->update();
     return true;
 }
 //>---------------------------------------------------------------------------------------
 
-bool EngineMain::update(bool force)
+bool EngineMain::update()
 {
     if (!m_init)
         return false;
-#if 0
-    static float t1 = -1.0f;
-    float t2 = timesys::ms();
-    float dt = 0.0f;
-    const float msPerFrame = 1000.0f / (float)m_updateFixedFPS;
-    if (t1 < 0.0f)
-    {
-        t1 = timesys::ms();
-    }
-    dt = t2 - t1;
-    if (dt > msPerFrame)
-    {
-        t1 = t2;
-    }
-    else
-#endif
-    if (!force)
-    {
-        return false;
-    }
     timesys::markTick(timesys::TICK_UPDATE);
-#if 0
-	int screenW = 1024, screenH = 600;
-	if (m_gfxMain && m_gfxMain->getMainWindow()) {
-		screenW = m_gfxMain->getMainWindow()->getWidth();
-		screenH = m_gfxMain->getMainWindow()->getHeight();
-	}
-	if (m_guiMain)
-		m_guiMain->setScreenSize(screenW, screenH);
-
-	// Update logic manager
-	if (m_gameMain)
-		m_gameMain->update();
-#endif
     // Well this is really useful system, in the end GUI and others will be hooked
     // to EventManager so everything what needs to be done is done in this function
     event::EventManager::processEventsAndTimers();
-
     executeEvent(event::Type::UpdateShot);
     return true;
 }

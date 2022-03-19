@@ -14,6 +14,7 @@ resource::ResourceManager::ResourceManager(base::ManagerBase *pEventMgr) : base_
                                                                            m_nMaximumMemory(0),
                                                                            m_bResourceReserved(false)
 {
+    m_thread.setThreadName("ResourceManager");
 }
 //>---------------------------------------------------------------------------------------
 
