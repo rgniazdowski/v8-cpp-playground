@@ -31,14 +31,12 @@ namespace script
      */
     class ScriptManager : public base::Manager<ScriptManager>, public fg::Singleton<ScriptManager>
     {
-    private:
-        using tag_type = util::Tag<self_type>;
-        using logger = logger::Logger<tag_type>;
-
     public:
         using self_type = ScriptManager;
         using manager_type = base::Manager<self_type>;
         friend class fg::Singleton<self_type>;
+        using tag_type = util::Tag<self_type>;
+        using logger = ::logger::Logger<tag_type>;
 
     protected:
         ScriptManager(char **argv);
@@ -105,12 +103,32 @@ namespace script
             util::WrappedArgs args;
             int numArgs;
             ScriptCallback *callback;
+            PendingCallback() : args(), numArgs(0), callback(nullptr) {}
             PendingCallback(const util::WrappedArgs &_args, ScriptCallback *_callback, int _numArgs) : args(), callback(_callback), numArgs(_numArgs) { util::copy_arguments(_args, args); }
             PendingCallback(const PendingCallback &other) : callback(other.callback), numArgs(other.numArgs) { util::copy_arguments(other.args, args); }
             PendingCallback(PendingCallback &&other) : args(std::move(other.args)), callback(other.callback), numArgs(other.numArgs)
             {
                 other.callback = nullptr;
                 other.numArgs = 0;
+            }
+            PendingCallback &operator=(const PendingCallback &other)
+            {
+                util::copy_arguments(other.args, args);
+                callback = other.callback;
+                numArgs = other.numArgs;
+                return *this;
+            }
+            PendingCallback &operator=(PendingCallback &&other)
+            {
+                if (this != &other)
+                {
+                    args = std::move(other.args);
+                    callback = other.callback;
+                    numArgs = other.numArgs;
+                    other.callback = nullptr;
+                    other.numArgs = 0;
+                }
+                return *this;
             }
             ~PendingCallback()
             {
@@ -121,7 +139,7 @@ namespace script
             }
         }; //# struct PendingCallback
         std::stack<PendingCallback> m_pendingCallbacks;
-        std::recursive_mutex m_mutex;
+        std::mutex m_mutex;
     }; //# class ScriptManager
 
 } //> namespace script

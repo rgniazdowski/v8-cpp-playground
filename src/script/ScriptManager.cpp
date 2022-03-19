@@ -5,6 +5,7 @@ script::ScriptManager::ScriptManager(char **argv) : manager_type(), m_argv(argv)
                                                     m_createParams(), m_isolate(nullptr),
                                                     m_platform(), m_contexts(), m_mutex()
 {
+    m_thread.setThreadName("ScriptManager");
     m_thread.setFunction([this]()
                          {
         v8::Locker locker(m_isolate);
@@ -105,7 +106,7 @@ bool script::ScriptManager::scriptCallbackHandler(const util::WrappedArgs &args)
     // This includes also the extra ScriptCallback external, which will be skipped because
     // of the extra parameter that shows a lower number of input arguments for the event.
     {
-        const std::lock_guard<std::recursive_mutex> lock(m_mutex);
+        const std::lock_guard<std::mutex> lock(m_mutex);
         m_pendingCallbacks.emplace(args, callback, (int)(args.size() - 1));
     }
     m_thread.wakeup(); // signal the thread because there are new callbacks pending
@@ -115,19 +116,19 @@ bool script::ScriptManager::scriptCallbackHandler(const util::WrappedArgs &args)
 
 void script::ScriptManager::processPendingCallbacks(void)
 {
-    std::unique_lock<std::recursive_mutex> lock(m_mutex);
     v8::HandleScope handle_scope(m_isolate);
     auto context = m_isolate->GetEnteredContext();
     while (true)
     {
-        lock.lock();
-        if (m_pendingCallbacks.empty())
-            break;
-        // move to new structure, will call destructor on next loop, releasing copied args vector
-        PendingCallback top(std::move(m_pendingCallbacks.top()));
-        m_pendingCallbacks.pop();
-        // unlock so callback execution can actually add more pending callbacks on next loop
-        lock.unlock();
+        PendingCallback top;
+        {
+            const std::lock_guard<std::mutex> lock(m_mutex);
+            if (m_pendingCallbacks.empty())
+                break;
+            // move to new structure, will call destructor on next loop, releasing copied args vector
+            top = std::move(m_pendingCallbacks.top());
+            m_pendingCallbacks.pop();
+        }
         if (top.callback->isFunction())
         {
             auto function = top.callback->m_nativeFunction.Get(m_isolate);
