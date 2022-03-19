@@ -48,6 +48,7 @@ set(FG_Util_Sources
     util/Profiling.cpp
     util/RegularFile.cpp
     util/Timesys.cpp
+    util/SimpleThread.cpp
     util/Util.cpp
     util/ZipFile.cpp
 )

@@ -10,7 +10,7 @@ namespace logger
     void appendPrefixToBuffer(char *pBuffer, const char *pLevel)
     {
         const time_t ts = timesys::seconds();
-        int mstru = (int)timesys::ms() % 1000;
+        int mstru = ((uint64_t)timesys::ms()) % 1000;
         struct tm ti;
         // struct tm *ti = localtime(&ts);
         localtime_s(&ti, &ts);

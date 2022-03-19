@@ -2,6 +2,8 @@
 #ifndef FG_INC_UTIL_SIMPLE_THREAD
 #define FG_INC_UTIL_SIMPLE_THREAD
 
+#include <util/Logger.hpp>
+
 #include <functional>
 #include <thread>
 #include <atomic>
@@ -11,8 +13,15 @@
 
 namespace util
 {
+    void setThreadName(std::thread &thread, const char *threadName);
+
     class SimpleThread
     {
+    public:
+        using self_type = SimpleThread;
+        using tag_type = util::Tag<self_type>;
+        using logger = logger::Logger<tag_type>;
+
     public:
         using InnerFunction = std::function<bool(void)>;
 
@@ -24,6 +33,7 @@ namespace util
                          m_wakeFlag(),
                          m_threadMutex(),
                          m_wakeCondition(),
+                         m_name("thread"),
                          m_interval() {}
 
         SimpleThread(const InnerFunction &function, bool isWakeable = false, int interval = 0)
@@ -35,6 +45,7 @@ namespace util
               m_wakeFlag(),
               m_threadMutex(),
               m_wakeCondition(),
+              m_name("thread"),
               m_interval(interval) {}
 
         ~SimpleThread()
@@ -49,7 +60,14 @@ namespace util
                 m_isWakeable = true;
         }
 
-        inline void setWakeable(bool toggle) noexcept { m_isWakeable = toggle; }
+        inline void setWakeable(bool toggle) noexcept
+        {
+            m_isWakeable = toggle;
+            if (!toggle)
+                m_interval = 0;
+        }
+
+        inline void setThreadName(std::string_view name) { m_name = name; }
 
         inline void stop(void) noexcept { abortAndJoin(); }
 
@@ -112,6 +130,7 @@ namespace util
             std::lock_guard<std::mutex> lock(m_threadMutex);
             m_wakeFlag.store(true);
             m_wakeCondition.notify_one();
+            logger::trace("Notified thread '%s'", m_name.data());
             return true;
         }
 
@@ -120,6 +139,7 @@ namespace util
             if (m_thread.joinable())
             {
                 m_thread.join();
+                logger::trace("Joined thread '%s'", m_name.data());
                 return true;
             }
             return false;
@@ -130,13 +150,16 @@ namespace util
         {
             if (m_abortRequested.load())
                 return; // skip!
+            m_running.load() && logger::trace("Marked '%s' for closing", m_name.data());
             m_abortRequested.store(true);
-            if (m_thread.joinable())
-                m_thread.join();
+            join();
+            m_running.store(false);
         }
 
         void mainWrapper(void)
         {
+            logger::debug("Starting thread '%s'...", m_name.data());
+            util::setThreadName(m_thread, m_name.data());
             m_running.store(true);
             while (m_abortRequested.load() == false)
             {
@@ -156,7 +179,7 @@ namespace util
                 }
                 catch (std::runtime_error &ex)
                 {
-                    // Some more specific
+                    logger::error("Runtime exception occurred in thread '%s': %s", m_name.data(), ex.what());
                     break;
                 }
                 catch (...)
@@ -166,10 +189,11 @@ namespace util
                 }
             }
             m_running.store(false);
+            logger::debug("Stopped thread '%s'", m_name.data());
         }
 
     protected:
-        auto getThreadWrapper(void)
+        inline auto getThreadWrapper(void)
         {
             return &SimpleThread::mainWrapper;
         }
@@ -183,6 +207,7 @@ namespace util
         std::atomic_bool m_wakeFlag;
         std::mutex m_threadMutex;
         std::condition_variable m_wakeCondition;
+        std::string m_name;
         int m_interval;
     }; //# SimpleThread
 

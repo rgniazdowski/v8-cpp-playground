@@ -80,7 +80,7 @@ int64_t timesys::ticks(void)
 #endif
 }
 //>---------------------------------------------------------------------------------------
-#if defined(FG_USING_WINDOWS)
+#if defined(FG_USING_PLATFORM_WINDOWS)
 #include <WindowsStandard.hpp>
 #elif defined(FG_USING_LINUX)
 #include <ctime>
@@ -89,13 +89,13 @@ int64_t timesys::ticks(void)
 void timesys::sleep(unsigned int ms)
 {
     if (!ms)
-        ms = 5;
-#if defined(FG_USING_WINDOWS)
+        ms = 1;
+#if defined(FG_USING_PLATFORM_WINDOWS)
     ::LARGE_INTEGER ft;
-    ft.QuadPart = -static_cast<int64>(ms * 1000 * 1000 * 10); // '-' using relative time
+    ft.QuadPart = -static_cast<int64_t>(ms * 1000 * 10); // '-' using relative time
 
-    ::HANDLE timer = ::CreateWaitableTimer(NULL, TRUE, NULL);
-    ::SetWaitableTimer(timer, &ft, 0, NULL, NULL, 0);
+    ::HANDLE timer = ::CreateWaitableTimer(nullptr, 1, nullptr);
+    ::SetWaitableTimer(timer, &ft, 0, nullptr, nullptr, 0);
     ::WaitForSingleObject(timer, INFINITE);
     ::CloseHandle(timer);
 #elif defined(FG_USING_LINUX)
