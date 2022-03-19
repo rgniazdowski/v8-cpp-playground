@@ -3,6 +3,7 @@
 #define FG_INC_MANAGER
 
 #include <cstdint>
+#include <mutex>
 
 #include <Singleton.hpp>
 #include <util/Handle.hpp>
@@ -26,7 +27,7 @@ namespace base
                                                                        m_managerId(managerId),
                                                                        m_instanceId(identifier),
                                                                        m_thread(*this) {}
-        virtual ~ManagerBase() { stopThread(); }
+        virtual ~ManagerBase();
 
         inline bool startThread(void) { return this->start(); }
         inline bool signalThread(void) { return this->wakeup(); }
@@ -55,7 +56,7 @@ namespace base
     //#-----------------------------------------------------------------------------------
 
     template <class TManagerType>
-    class Manager : virtual protected ManagerBase
+    class Manager : virtual public ManagerBase
     {
     private:
         inline static uint64_t s_instanceId = 0;
@@ -67,15 +68,6 @@ namespace base
     public:
         Manager() : ManagerBase(self_type::id(), self_type::aquireInstanceId()) {}
         virtual ~Manager() {}
-
-        using ManagerBase::joinThread;
-        using ManagerBase::signalThread;
-        using ManagerBase::startThread;
-        using ManagerBase::stopThread;
-
-        using ManagerBase::isJoinable;
-        using ManagerBase::isRunning;
-        using ManagerBase::isWakeable;
 
         /**
          * @brief Acquire and retrieve unique identifier for a given manager type (Manager Id),
@@ -93,7 +85,7 @@ namespace base
 
     private:
         inline static bool s_idset = false;
-        inline static uint8_t s_lid = 0;
+        inline static uint32_t s_lid = 0;
     }; //# class Manager
     //#-----------------------------------------------------------------------------------
 
@@ -105,6 +97,7 @@ namespace base
         {
             uint32_t managerId;
             ManagerBase *manager;
+            Wrapped(uint32_t _mId, ManagerBase *_mgr) : managerId(_mId), manager(_mgr) {}
         };
         using RegistryMap = std::unordered_map<uint32_t, Wrapped>;
 
@@ -176,6 +169,44 @@ namespace base
             return m_registry.find(managerId) != m_registry.end();
         }
 
+        template <typename TManagerType>
+        bool remove(void)
+        {
+            static_assert(std::is_base_of_v<ManagerBase, TManagerType>,
+                          "TManagerType template parameter type needs to be derived from ManagerBase");
+            using manager_type = std::remove_pointer_t<TManagerType>;
+            const std::lock_guard<std::mutex> lock(m_mutex);
+            if (m_registry.find(manager_type::id()) != m_registry.end())
+            {
+                m_registry.erase(manager_type::id());
+                return true;
+            }
+            return false;
+        }
+
+        bool remove(uint32_t managerId)
+        {
+            const std::lock_guard<std::mutex> lock(m_mutex);
+            if (m_registry.find(managerId) != m_registry.end())
+            {
+                m_registry.erase(managerId);
+                return true;
+            }
+            return false;
+        }
+
+        bool remove(ManagerBase *pManager)
+        {
+            const auto managerId = pManager->getManagerId();
+            const std::lock_guard<std::mutex> lock(m_mutex);
+            if (m_registry.find(managerId) != m_registry.end())
+            {
+                m_registry.erase(managerId);
+                return true;
+            }
+            return false;
+        }
+
         bool isJoinable(uint32_t managerId) const
         {
             auto manager = get<ManagerBase>(managerId);
@@ -200,11 +231,25 @@ namespace base
             return manager->isWakeable();
         }
 
+        void signalAll(void)
+        {
+            for (auto &it : m_registry)
+                it.second.manager->signalThread();
+        }
+
+        RegistryMap &getRegistryDirect(void) { return m_registry; }
+
     protected:
         RegistryMap m_registry;
         mutable std::mutex m_mutex;
     }; //# class ManagerRegistry
     //#-----------------------------------------------------------------------------------
+
+    inline ManagerBase::~ManagerBase()
+    {
+        ManagerRegistry::instance()->remove(this->getManagerId());
+    }
+    //>-----------------------------------------------------------------------------------
 
 } //> namespace base
 
