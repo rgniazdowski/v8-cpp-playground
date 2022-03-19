@@ -93,7 +93,9 @@ set(FG_Script_Sources
 #
 # Root sources / base
 set(FG_Root_Headers
+    Application.hpp
     BuildConfig.hpp
+    ConsoleApplication.hpp
     EngineMain.hpp
     Manager.hpp
     Quality.hpp
@@ -152,6 +154,8 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-DDEBUG)
 endif()
 add_definitions(-D_HAS_AUTO_PTR_ETC=1)
+add_definitions(-DV8_31BIT_SMIS_ON_64BIT_ARCH=1)
+add_definitions(-DV8_COMPRESS_POINTERS)
 
 ## Static library definition
 add_library(${STATIC_LIB_NAME} STATIC 
