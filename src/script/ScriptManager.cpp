@@ -1,5 +1,7 @@
 #include <script/ScriptManager.hpp>
 #include <script/ScriptCallback.hpp>
+#include <script/modules/Console.hpp>
+#include <v8pp/convert.hpp>
 
 script::ScriptManager::ScriptManager(char **argv) : manager_type(), m_argv(argv),
                                                     m_createParams(), m_isolate(nullptr),
@@ -17,11 +19,32 @@ script::ScriptManager::ScriptManager(char **argv) : manager_type(), m_argv(argv)
         m_isolate->RunMicrotasks(); // run microtasks from previous frame
         this->processPendingCallbacks();
         return true; });
-    // thread will wakeup by itself every 1ms (1000fps) to run V8 microtasks and have
+    // thread will wakeup by itself every 1ms (1000fps) to run V8 microtasks and have (for now)
     // callbacks triggered (from event thread)
-    m_thread.setInterval(1);
+    // TODO actually should be different in order to not execute too many actions mid-frame
+    // Ideally should be twice as screen refresh rate, so it should be configurable
+    // Later on it also could be woken up on every refresh frame shot
+    m_thread.setInterval(1); // 1000Hz - FIXME
     m_thread.setWakeable(true);
-}
+    // #FIXME
+    script::registerWrappedValueConverter<v8::Integer, util::WrappedValue::CHAR>();
+    script::registerWrappedValueConverter<v8::Integer, util::WrappedValue::SIGNED_CHAR>();
+    script::registerWrappedValueConverter<v8::Integer, util::WrappedValue::UNSIGNED_CHAR>();
+    script::registerWrappedValueConverter<v8::Integer, util::WrappedValue::SHORT>();
+    script::registerWrappedValueConverter<v8::Integer, util::WrappedValue::SIGNED_SHORT>();
+    script::registerWrappedValueConverter<v8::Integer, util::WrappedValue::UNSIGNED_SHORT>();
+    script::registerWrappedValueConverter<v8::Integer, util::WrappedValue::INT>();
+    script::registerWrappedValueConverter<v8::Integer, util::WrappedValue::UNSIGNED_INT>();
+    script::registerWrappedValueConverter<v8::Integer, util::WrappedValue::LONG>();
+    script::registerWrappedValueConverter<v8::Integer, util::WrappedValue::UNSIGNED_LONG>();
+    script::registerWrappedValueConverter<v8::Integer, util::WrappedValue::LONG_LONG>();
+    script::registerWrappedValueConverter<v8::Integer, util::WrappedValue::UNSIGNED_LONG_LONG>();
+    script::registerWrappedValueConverter<v8::Number, util::WrappedValue::FLOAT>();
+    script::registerWrappedValueConverter<v8::Number, util::WrappedValue::DOUBLE>();
+    script::registerWrappedValueConverter<v8::Boolean, util::WrappedValue::BOOL>();
+    script::registerWrappedValueConverter<v8::String, util::WrappedValue::STRING>();
+    script::registerWrappedValueConverter<v8::String, util::WrappedValue::STRING>();
+} //> ScriptManager()
 //>---------------------------------------------------------------------------------------
 
 script::ScriptManager::~ScriptManager()
@@ -49,16 +72,22 @@ bool script::ScriptManager::initialize(void)
         v8::Isolate::Scope isolate_scope(m_isolate);
         // Create a stack-allocated handle scope.
         v8::HandleScope handle_scope(m_isolate);
+        {
+            // Need to create and initialize list of globals and built-in modules.
+            auto console = new modules::Console(m_isolate);
+            console->initialize();
+            registerModule(console);
+        }
         // Create a new context.
-        LocalContext context = v8::Context::New(m_isolate);
-        m_contexts.emplace("main", WrappedContext(m_isolate, context));
-        // main context is registered - now can create and manage all global objects before
-        // entering (in another thread) a special event loop for microtasks and callbacks
+        // Main context is registered - now can create and manage all global objects before
+        // entering (in another thread) a special event loop for microtasks and callbacks.
+        // Globals are also initialized within.
+        LocalContext context = createContext("main");
     }
     m_init = true;
     m_thread.start();
     return true;
-}
+} //> initialize()
 //>---------------------------------------------------------------------------------------
 
 bool script::ScriptManager::destroy(void)
@@ -67,6 +96,7 @@ bool script::ScriptManager::destroy(void)
         return false;
     signalThread();
     stopThread();
+    releaseModules();
     m_contexts.clear(); // reset the context map completely
     // Dispose the isolate and tear down V8.
     m_isolate->Dispose();
@@ -76,7 +106,7 @@ bool script::ScriptManager::destroy(void)
     m_isolate = nullptr;
     m_init = false;
     return true;
-}
+} //> destroy()
 //>---------------------------------------------------------------------------------------
 
 script::LocalContext script::ScriptManager::getContext(const std::string &name)
@@ -85,7 +115,92 @@ script::LocalContext script::ScriptManager::getContext(const std::string &name)
     if (it == m_contexts.end())
         return LocalContext();
     return it->second.local(m_isolate);
-}
+} //> getContext(...)
+//>---------------------------------------------------------------------------------------
+
+script::LocalContext script::ScriptManager::createContext(const std::string &name)
+{
+    if (name.empty() || !getContext(name).IsEmpty())
+        return LocalContext(); // empty
+    LocalContext context = v8::Context::New(m_isolate);
+    auto it = m_contexts.emplace(name, WrappedContext(m_isolate, context)).first;
+    instantiateGlobals(context, it->second);
+    return context;
+} //> createContext(...)
+//>---------------------------------------------------------------------------------------
+
+bool script::ScriptManager::instantiateGlobals(LocalContext &context, WrappedContext &wrappedContext)
+{
+    if (context.IsEmpty())
+        return false;
+    // Process the current list of present modules and update contexts
+    for (auto &it : m_modules)
+    {
+        auto module = it.second;
+        // process current module only if it's not loadable, is initialized and is not present on context
+        if (!module->isLoadable() && module->isInitialized() && !wrappedContext.hasModule(module->getName()))
+        {
+            // module is not loadable - therefore it's only for polluting the global scope
+            if (module->instantiateGlobals(context))
+                wrappedContext.addModule(module->getName()); // this just adds the name for tracing
+        }
+    }
+    return true;
+} //> initializeGlobals(...)
+//>---------------------------------------------------------------------------------------
+
+bool script::ScriptManager::registerModule(Module *module)
+{
+    if (!module)
+        return false;
+    if (module->getName().empty())
+        return false;
+    if (hasModule(module->getName()))
+        return false;
+    // registering new module should also update the existing contexts?
+    return true;
+} //> registerModule(...)
+//>---------------------------------------------------------------------------------------
+
+script::Module *script::ScriptManager::getModule(const std::string &name)
+{
+    if (name.empty())
+        return nullptr;
+    auto found = m_modules.find(name);
+    if (found == m_modules.end())
+        return nullptr;
+    return found->second;
+} //> getModule(...)
+//>---------------------------------------------------------------------------------------
+
+bool script::ScriptManager::hasModule(const std::string &name) const
+{
+    if (name.empty())
+        return false;
+    return m_modules.find(name) != m_modules.end();
+} //> hasModule(...)
+//>---------------------------------------------------------------------------------------
+
+void script::ScriptManager::releaseModules(void)
+{
+    const std::lock_guard<std::mutex> lock(m_mutex);
+    for (auto &it : m_modules)
+    {
+        delete it.second;
+        it.second = nullptr;
+    }
+    m_modules.clear();
+} //> releaseModules()
+//>---------------------------------------------------------------------------------------
+
+// void script::ScriptManager::evaluateModule(const std::string &script, const std::string &name)
+//{
+//  This is a special callback action, that's supposed to evaluate script source
+//  in full (the whole file) and treat it as a module (ModuleCallback). In this
+//  case it has to create a temporary context (different global scope).
+//  Every module has it's own context assigned to it.
+//  Modules are loaded via require() global.
+//} //> evaluateModule(...)
 //>---------------------------------------------------------------------------------------
 
 bool script::ScriptManager::scriptCallbackHandler(const util::WrappedArgs &args)
@@ -111,7 +226,7 @@ bool script::ScriptManager::scriptCallbackHandler(const util::WrappedArgs &args)
     }
     m_thread.wakeup(); // signal the thread because there are new callbacks pending
     return true;
-}
+} //> scriptCallbackHandler(...)
 //>---------------------------------------------------------------------------------------
 
 void script::ScriptManager::processPendingCallbacks(void)
@@ -129,10 +244,10 @@ void script::ScriptManager::processPendingCallbacks(void)
             top = std::move(m_pendingCallbacks.top());
             m_pendingCallbacks.pop();
         }
+        v8::TryCatch tryCatch(m_isolate);
         if (top.callback->isFunction())
         {
             auto function = top.callback->m_nativeFunction.Get(m_isolate);
-            v8::TryCatch tryCatch(m_isolate);
             // convert wrapped args into an array of local values to be used as inputs to JS function
             // it requires a map/array of converters because type information is lost when values is wrapped
             util::WrappedArgs registeredArgs; // any external pointers that have been registered with V8 are placed here - these are temporary
@@ -140,27 +255,44 @@ void script::ScriptManager::processPendingCallbacks(void)
             // need to figure out if using 'this' as global is ok, or can it be undefined
             auto result = function->Call(context, context->Global(), static_cast<int>(top.args.size()), argv.get());
             unregisterArgs(m_isolate, registeredArgs); // release any temporary objects from V8 - any handles will be invalidated
-            if (result.IsEmpty())
-            {
-                auto ex = tryCatch.Exception();
-            }
         }
         else if (top.callback->isScriptEval())
         {
             auto source =
                 v8::String::NewFromUtf8(m_isolate, top.callback->m_script.c_str(), v8::NewStringType::kNormal)
                     .ToLocalChecked();
-            v8::TryCatch tryCatch(m_isolate);
             auto maybeScript = v8::Script::Compile(context, source);
-            if (maybeScript.IsEmpty())
-                continue;
-            auto script = maybeScript.ToLocalChecked();
-            auto result = script->Run(context);
-            if (result.IsEmpty())
+            if (!maybeScript.IsEmpty())
             {
-                auto ex = tryCatch.Exception();
+                auto script = maybeScript.ToLocalChecked();
+                auto result = script->Run(context);
             }
         }
+        if (tryCatch.HasCaught())
+        {
+            auto message = tryCatch.Message();
+            auto exception = tryCatch.Exception();
+            std::string errorStr;
+            if (message.IsEmpty())
+            {
+                LocalString msgStr;
+                if (exception->ToString(context).ToLocal(&msgStr))
+                {
+                    auto msgValue = msgStr.As<v8::Value>();
+                    errorStr = v8pp::from_v8<std::string>(m_isolate, msgValue);
+                }
+            }
+            else
+            {
+                auto msgValue = message->Get().As<v8::Value>();
+                if (!msgValue.IsEmpty())
+                    errorStr = v8pp::from_v8<std::string>(m_isolate, msgValue);
+            }
+            if (!errorStr.empty())
+                logger::error("V8 Exception occurred while executing pending callback: %s", errorStr.c_str());
+            else
+                logger::fatal("V8 Exception occurred while executing pending callback - unable to retrieve message from exception...");
+        }
     }
-}
+} //> processPendingCallbacks(...)
 //>---------------------------------------------------------------------------------------

@@ -3,6 +3,7 @@
 #include <resource/GlobalObjectRegistry.hpp>
 
 #include <unordered_map>
+#include <sstream>
 
 script::LocalValue *script::argsToPointer(v8::Isolate *isolate, util::WrappedArgs const &args, util::WrappedArgs &registeredArgs, int numArgs)
 {
@@ -67,6 +68,27 @@ void script::unregisterArgs(v8::Isolate *isolate, const util::WrappedArgs &regis
         if (!registered)
             converter->unregister(isolate, wrapped);
     } //# for each original argument
+}
+//>---------------------------------------------------------------------------------------
+
+void script::argsToString(FunctionCallbackInfo const &args, std::string &output)
+{
+    std::stringstream strstream;
+    for (int i = 0; i < args.Length(); ++i)
+    {
+        if (i > 0)
+            strstream << ' ';
+        try
+        {
+            v8::String::Utf8Value const str(args.GetIsolate(), args[i]);
+            strstream << *str;
+        }
+        catch (...)
+        {
+            /* silent */
+        }
+    }
+    output.assign(std::move(strstream.str()));
 }
 //>---------------------------------------------------------------------------------------
 

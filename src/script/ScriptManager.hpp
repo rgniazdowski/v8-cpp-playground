@@ -8,6 +8,7 @@
 #include <util/Logger.hpp>
 #include <util/Bindings.hpp>
 #include <script/V8.hpp>
+#include <script/Module.hpp>
 
 #include <unordered_map>
 #include <stack>
@@ -44,6 +45,8 @@ namespace script
         ScriptManager(self_type &&other) = delete;
         virtual ~ScriptManager();
 
+        using ModuleRegistry = std::unordered_map<std::string, Module *>;
+
     public:
         virtual bool initialize(void) override;
         virtual bool destroy(void) override;
@@ -51,6 +54,12 @@ namespace script
         bool scriptCallbackHandler(const util::WrappedArgs &args);
 
         LocalContext getContext(const std::string &name = "main");
+        LocalContext createContext(const std::string &name);
+
+        bool registerModule(Module *module);
+        Module *getModule(const std::string &name);
+        bool hasModule(const std::string &name) const;
+        void releaseModules(void);
 
         inline v8::Isolate *getIsolate(void) { return m_isolate; }
 
@@ -78,6 +87,7 @@ namespace script
         {
             v8::Isolate *isolate;
             PersistentContext self;
+            std::vector<std::string> modules;
             WrappedContext() : isolate(nullptr), self() {}
             WrappedContext(v8::Isolate *_isolate, LocalContext &_context) : isolate(_isolate), self()
             {
@@ -96,8 +106,29 @@ namespace script
             }
             inline LocalContext local() const { return self.Get(isolate); }
             inline LocalContext local(v8::Isolate *_isolate) const { return self.Get(_isolate); }
+            inline void addModule(const std::string &name)
+            {
+                if (hasModule(name))
+                    return;
+                modules.push_back(name);
+            }
+            inline bool hasModule(const std::string &name)
+            {
+                auto idx = util::find(modules, name);
+                return idx >= 0;
+            }
+            inline void removeModule(const std::string &name)
+            {
+                auto idx = util::find(modules, name);
+                if (idx < 0)
+                    return;
+                util::remove(modules, (size_t)idx);
+            }
         }; //# struct WrappedContext
-        std::unordered_map<std::string, WrappedContext> m_contexts;
+        bool instantiateGlobals(LocalContext &context, WrappedContext &wrappedContext);
+        using ContextCache = std::unordered_map<std::string, WrappedContext>;
+        ContextCache m_contexts;
+        ModuleRegistry m_modules;
         struct PendingCallback
         {
             util::WrappedArgs args;

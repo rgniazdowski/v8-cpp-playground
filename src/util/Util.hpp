@@ -52,6 +52,17 @@ namespace util
     }
 
     template <class T, class Alloc = std::allocator<T>>
+    bool remove(std::vector<T, Alloc> &vec, typename std::vector<T, Alloc>::size_type index)
+    {
+        auto size = vec.size();
+        if (index >= size)
+            return false;
+        vec.operator[](index) = vec.operator[](size - 1);
+        vec.resize(size - 1);
+        return true;
+    }
+
+    template <class T, class Alloc = std::allocator<T>>
     std::vector<T, Alloc> reverse(std::vector<T, Alloc> const &vec)
     {
         using vec_type = std::vector<T, Alloc>;

@@ -83,10 +83,14 @@ set(FG_Event_Sources
 #
 # Script source
 set(FG_Script_Headers
+    script/modules/Console.hpp
+    script/InternalModule.hpp    
+    script/Module.hpp
     script/ScriptManager.hpp
     script/V8.hpp
 )
 set(FG_Script_Sources
+    script/modules/Console.cpp
     script/ScriptManager.cpp
     script/V8.cpp
 )

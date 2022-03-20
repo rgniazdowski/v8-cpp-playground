@@ -33,7 +33,9 @@ namespace script
     using PersistentProxy = v8::Persistent<v8::Proxy, v8::CopyablePersistentTraits<v8::Proxy>>;
     using PersistentContext = v8::Persistent<v8::Context>;
 
-    inline LocalValue *argsToPointer(v8::FunctionCallbackInfo<v8::Value> const &args)
+    using FunctionCallbackInfo = v8::FunctionCallbackInfo<v8::Value>;
+
+    inline LocalValue *argsToPointer(FunctionCallbackInfo const &args)
     {
         const auto argc = args.Length();
         auto argv = new LocalValue[argc];
@@ -43,6 +45,7 @@ namespace script
         } //# for each original argument
         return argv;
     }
+
     inline LocalValue *argsToPointer(v8::Isolate *isolate, std::vector<PersistentValue> const &args)
     {
         const int argc = static_cast<int>(args.size());
@@ -53,9 +56,12 @@ namespace script
         } //# for each original argument
         return argv;
     }
+
     LocalValue *argsToPointer(v8::Isolate *isolate, util::WrappedArgs const &args, util::WrappedArgs &registeredArgs, int numArgs = -1);
 
     void unregisterArgs(v8::Isolate *isolate, const util::WrappedArgs &registeredArgs);
+
+    void argsToString(FunctionCallbackInfo const &args, std::string &output);
 
     struct WrappedValueConverter
     {
