@@ -177,6 +177,8 @@ if(OS MATCHES "windows")
     set_target_properties(${EXECUTABLE_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
     set_target_properties(${EXECUTABLE_NAME} PROPERTIES VS_CONFIGURATION_TYPE "Application")
     target_compile_options(${EXECUTABLE_NAME} PRIVATE /MP${CMAKE_BUILD_PARALLEL_LEVEL})
+
+    set_target_properties(${STATIC_LIB_NAME} PROPERTIES VS_CONFIGURATION_TYPE "StaticLibrary")
     target_compile_options(${STATIC_LIB_NAME} PRIVATE /MP${CMAKE_BUILD_PARALLEL_LEVEL})
 endif() # OS
 

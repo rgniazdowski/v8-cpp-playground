@@ -36,12 +36,13 @@ namespace script
         // callback for many different input types (events, custom timer parameters etc.)
         using ScriptMethod = bool (UserClass::*)(const util::WrappedArgs &);
 
-    public:
+    protected:
         ScriptCallback() : base_type() { m_type = CALLBACK_SCRIPT; }
         ScriptCallback(UserClass *pObject) : base_type(pObject) { m_type = CALLBACK_SCRIPT; }
         ScriptCallback(util::BindInfo *pBinding) : base_type(pBinding) { m_type = CALLBACK_SCRIPT; }
         ScriptCallback(util::BindInfo *pBinding, UserClass *pObject) : base_type(pBinding, pObject) { m_type = CALLBACK_SCRIPT; }
 
+    public:
         virtual ~ScriptCallback()
         {
             m_nativeFunction.Reset();
@@ -97,6 +98,9 @@ namespace script
 
         inline bool isFunction(void) const { return m_script.empty() && !m_nativeFunction.IsEmpty(); }
 
+        inline uint64_t getIdentifier(void) const { return 0; /* ignored */ }
+
+    protected:
         static self_type *create(ScriptMethod methodMember, UserClass *pObject = nullptr)
         {
             // Binding is done automatically to a special method present on ScriptManager.
@@ -106,8 +110,6 @@ namespace script
             // values and these will get passed into the native function upon calling.
             return new self_type(new util::BindInfoMethod<UserClass, bool, const util::WrappedArgs &>("callback", methodMember, {}), pObject);
         }
-
-        inline uint64_t getIdentifier(void) const { return 0; /* ignored */ }
 
     protected:
         PersistentFunction m_nativeFunction;
