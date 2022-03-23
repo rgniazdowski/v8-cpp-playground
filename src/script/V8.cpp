@@ -1,4 +1,5 @@
 #include <script/V8.hpp>
+#include <util/Logger.hpp>
 #include <util/Bindings.hpp>
 #include <resource/GlobalObjectRegistry.hpp>
 
@@ -89,6 +90,38 @@ void script::argsToString(FunctionCallbackInfo const &args, std::string &output)
         }
     }
     output.assign(std::move(strstream.str()));
+}
+//>---------------------------------------------------------------------------------------
+
+void script::processException(v8::Isolate *isolate, LocalContext &context, v8::TryCatch &tryCatch)
+{
+    if (tryCatch.HasCaught())
+    {
+        if (tryCatch.CanContinue())
+            isolate->CancelTerminateExecution();
+        auto message = tryCatch.Message();
+        auto exception = tryCatch.Exception();
+        std::string errorStr;
+        if (message.IsEmpty())
+        {
+            LocalString msgStr;
+            if (exception->ToString(context).ToLocal(&msgStr))
+            {
+                auto msgValue = msgStr.As<v8::Value>();
+                errorStr = v8pp::from_v8<std::string>(isolate, msgValue);
+            }
+        }
+        else
+        {
+            auto msgValue = message->Get().As<v8::Value>();
+            if (!msgValue.IsEmpty())
+                errorStr = v8pp::from_v8<std::string>(isolate, msgValue);
+        }
+        if (!errorStr.empty())
+            logger::PrintError("V8 Exception occurred while executing pending callback: %s", errorStr.c_str());
+        else
+            logger::PrintError("V8 Exception occurred while executing pending callback - unable to retrieve message from exception...");
+    }
 }
 //>---------------------------------------------------------------------------------------
 

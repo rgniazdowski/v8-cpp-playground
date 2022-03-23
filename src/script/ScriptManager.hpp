@@ -16,6 +16,7 @@
 namespace script
 {
     class ScriptCallback;
+    class ScriptTimerCallback;
     /**
      * For now it should manage just one top Isolate and one main context with possibility
      * to create more named contexts and switch between them.
@@ -62,6 +63,13 @@ namespace script
         void releaseModules(void);
 
         inline v8::Isolate *getIsolate(void) { return m_isolate; }
+
+        ScriptCallback *createScriptCallback(void);
+        ScriptCallback *createScriptCallback(const LocalFunction &function);
+        ScriptCallback *createScriptCallback(const LocalString &script);
+        ScriptTimerCallback *createScriptTimerCallback(void);
+        ScriptTimerCallback *createScriptTimerCallback(const LocalFunction &function);
+        ScriptTimerCallback *createScriptTimerCallback(const LocalFunction &function, std::vector<LocalValue> const &args);
 
     protected:
         void processPendingCallbacks(void);

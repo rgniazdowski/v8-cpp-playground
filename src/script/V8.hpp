@@ -7,6 +7,7 @@
 
 #include <util/Bindings.hpp>
 #include <v8pp/class.hpp>
+#include <v8pp/convert.hpp>
 #include <resource/GlobalObjectRegistry.hpp>
 
 namespace script
@@ -62,6 +63,8 @@ namespace script
     void unregisterArgs(v8::Isolate *isolate, const util::WrappedArgs &registeredArgs);
 
     void argsToString(FunctionCallbackInfo const &args, std::string &output);
+
+    void processException(v8::Isolate *isolate, LocalContext &context, v8::TryCatch &tryCatch);
 
     struct WrappedValueConverter
     {

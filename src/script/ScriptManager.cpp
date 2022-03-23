@@ -3,6 +3,9 @@
 #include <script/modules/Console.hpp>
 #include <v8pp/convert.hpp>
 
+#include <event/EventManager.hpp>
+#include <resource/ResourceManager.hpp>
+
 script::ScriptManager::ScriptManager(char **argv) : manager_type(), m_argv(argv),
                                                     m_createParams(), m_isolate(nullptr),
                                                     m_platform(), m_contexts(), m_mutex()
@@ -45,14 +48,14 @@ script::ScriptManager::ScriptManager(char **argv) : manager_type(), m_argv(argv)
     script::registerWrappedValueConverter<v8::String, util::WrappedValue::STRING>();
     script::registerWrappedValueConverter<v8::String, util::WrappedValue::STRING>();
 } //> ScriptManager()
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------
 
 script::ScriptManager::~ScriptManager()
 {
     self_type::destroy();
     script::unregisterWrappedValueConverters(); // no longer needed - might as well unregister all of them
 }
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------
 
 bool script::ScriptManager::initialize(void)
 {
@@ -85,10 +88,9 @@ bool script::ScriptManager::initialize(void)
         LocalContext context = createContext("main");
     }
     m_init = true;
-    m_thread.start();
     return true;
 } //> initialize()
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------
 
 bool script::ScriptManager::destroy(void)
 {
@@ -107,7 +109,7 @@ bool script::ScriptManager::destroy(void)
     m_init = false;
     return true;
 } //> destroy()
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------
 
 script::LocalContext script::ScriptManager::getContext(const std::string &name)
 {
@@ -116,18 +118,19 @@ script::LocalContext script::ScriptManager::getContext(const std::string &name)
         return LocalContext();
     return it->second.local(m_isolate);
 } //> getContext(...)
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------
 
 script::LocalContext script::ScriptManager::createContext(const std::string &name)
 {
     if (name.empty() || !getContext(name).IsEmpty())
         return LocalContext(); // empty
     LocalContext context = v8::Context::New(m_isolate);
+    v8::Context::Scope context_scope(context);
     auto it = m_contexts.emplace(name, WrappedContext(m_isolate, context)).first;
     instantiateGlobals(context, it->second);
     return context;
 } //> createContext(...)
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------
 
 bool script::ScriptManager::instantiateGlobals(LocalContext &context, WrappedContext &wrappedContext)
 {
@@ -147,7 +150,7 @@ bool script::ScriptManager::instantiateGlobals(LocalContext &context, WrappedCon
     }
     return true;
 } //> initializeGlobals(...)
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------
 
 bool script::ScriptManager::registerModule(Module *module)
 {
@@ -158,9 +161,10 @@ bool script::ScriptManager::registerModule(Module *module)
     if (hasModule(module->getName()))
         return false;
     // registering new module should also update the existing contexts?
+    m_modules.emplace(module->getName(), module);
     return true;
 } //> registerModule(...)
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------
 
 script::Module *script::ScriptManager::getModule(const std::string &name)
 {
@@ -171,7 +175,7 @@ script::Module *script::ScriptManager::getModule(const std::string &name)
         return nullptr;
     return found->second;
 } //> getModule(...)
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------
 
 bool script::ScriptManager::hasModule(const std::string &name) const
 {
@@ -179,7 +183,7 @@ bool script::ScriptManager::hasModule(const std::string &name) const
         return false;
     return m_modules.find(name) != m_modules.end();
 } //> hasModule(...)
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------
 
 void script::ScriptManager::releaseModules(void)
 {
@@ -191,7 +195,45 @@ void script::ScriptManager::releaseModules(void)
     }
     m_modules.clear();
 } //> releaseModules()
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------
+
+script::ScriptCallback *script::ScriptManager::createScriptCallback(void)
+{
+    return ScriptCallback::create(&ScriptManager::scriptCallbackHandler, this);
+}
+//>#--------------------------------------------------------------------------------------
+
+script::ScriptCallback *script::ScriptManager::createScriptCallback(const LocalFunction &function)
+{
+    return ScriptCallback::create(&ScriptManager::scriptCallbackHandler, m_isolate, function, this);
+}
+//>#--------------------------------------------------------------------------------------
+
+script::ScriptCallback *script::ScriptManager::createScriptCallback(const LocalString& script) 
+{
+    return ScriptCallback::create(&ScriptManager::scriptCallbackHandler, m_isolate, script, this);
+}
+//>#--------------------------------------------------------------------------------------
+
+script::ScriptTimerCallback *script::ScriptManager::createScriptTimerCallback(void)
+{
+    return ScriptTimerCallback::create(&ScriptManager::scriptCallbackHandler, this);
+}
+//>#--------------------------------------------------------------------------------------
+
+script::ScriptTimerCallback *script::ScriptManager::createScriptTimerCallback(const LocalFunction &function)
+{
+    return ScriptTimerCallback::create(&ScriptManager::scriptCallbackHandler, m_isolate, function, this);
+}
+//>#--------------------------------------------------------------------------------------
+
+script::ScriptTimerCallback *script::ScriptManager::createScriptTimerCallback(const LocalFunction &function, std::vector<LocalValue> const &args)
+{
+    auto callback = ScriptTimerCallback::create(&ScriptManager::scriptCallbackHandler, m_isolate, function, this);
+    callback->setArguments(m_isolate, args);
+    return callback;
+}
+//>#--------------------------------------------------------------------------------------
 
 // void script::ScriptManager::evaluateModule(const std::string &script, const std::string &name)
 //{
@@ -201,7 +243,7 @@ void script::ScriptManager::releaseModules(void)
 //  Every module has it's own context assigned to it.
 //  Modules are loaded via require() global.
 //} //> evaluateModule(...)
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------
 
 bool script::ScriptManager::scriptCallbackHandler(const util::WrappedArgs &args)
 {
@@ -227,7 +269,7 @@ bool script::ScriptManager::scriptCallbackHandler(const util::WrappedArgs &args)
     m_thread.wakeup(); // signal the thread because there are new callbacks pending
     return true;
 } //> scriptCallbackHandler(...)
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------
 
 void script::ScriptManager::processPendingCallbacks(void)
 {
@@ -245,54 +287,8 @@ void script::ScriptManager::processPendingCallbacks(void)
             m_pendingCallbacks.pop();
         }
         v8::TryCatch tryCatch(m_isolate);
-        if (top.callback->isFunction())
-        {
-            auto function = top.callback->m_nativeFunction.Get(m_isolate);
-            // convert wrapped args into an array of local values to be used as inputs to JS function
-            // it requires a map/array of converters because type information is lost when values is wrapped
-            util::WrappedArgs registeredArgs; // any external pointers that have been registered with V8 are placed here - these are temporary
-            std::unique_ptr<LocalValue> argv(argsToPointer(m_isolate, top.args, registeredArgs, top.numArgs));
-            // need to figure out if using 'this' as global is ok, or can it be undefined
-            auto result = function->Call(context, context->Global(), static_cast<int>(top.args.size()), argv.get());
-            unregisterArgs(m_isolate, registeredArgs); // release any temporary objects from V8 - any handles will be invalidated
-        }
-        else if (top.callback->isScriptEval())
-        {
-            auto source =
-                v8::String::NewFromUtf8(m_isolate, top.callback->m_script.c_str(), v8::NewStringType::kNormal)
-                    .ToLocalChecked();
-            auto maybeScript = v8::Script::Compile(context, source);
-            if (!maybeScript.IsEmpty())
-            {
-                auto script = maybeScript.ToLocalChecked();
-                auto result = script->Run(context);
-            }
-        }
-        if (tryCatch.HasCaught())
-        {
-            auto message = tryCatch.Message();
-            auto exception = tryCatch.Exception();
-            std::string errorStr;
-            if (message.IsEmpty())
-            {
-                LocalString msgStr;
-                if (exception->ToString(context).ToLocal(&msgStr))
-                {
-                    auto msgValue = msgStr.As<v8::Value>();
-                    errorStr = v8pp::from_v8<std::string>(m_isolate, msgValue);
-                }
-            }
-            else
-            {
-                auto msgValue = message->Get().As<v8::Value>();
-                if (!msgValue.IsEmpty())
-                    errorStr = v8pp::from_v8<std::string>(m_isolate, msgValue);
-            }
-            if (!errorStr.empty())
-                logger::error("V8 Exception occurred while executing pending callback: %s", errorStr.c_str());
-            else
-                logger::fatal("V8 Exception occurred while executing pending callback - unable to retrieve message from exception...");
-        }
+        top.callback->evaluate(m_isolate, top.args, top.numArgs);
+        script::processException(m_isolate, context, tryCatch);
     }
 } //> processPendingCallbacks(...)
-//>---------------------------------------------------------------------------------------
+//>#--------------------------------------------------------------------------------------

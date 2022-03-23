@@ -6,10 +6,12 @@
 #include <util/Callbacks.hpp>
 //#include <util/Handle.hpp>
 #include <script/V8.hpp>
+#include <iostream>
 
 namespace script
 {
-    inline const util::CallbackType CALLBACK_SCRIPT = 3;
+    inline const util::CallbackType CALLBACK_SCRIPT = 3;       // FIXME
+    inline const util::CallbackType CALLBACK_SCRIPT_TIMER = 4; // FIXME
 
     class ScriptManager;
 
@@ -37,15 +39,16 @@ namespace script
         using ScriptMethod = bool (UserClass::*)(const util::WrappedArgs &);
 
     protected:
-        ScriptCallback() : base_type() { m_type = CALLBACK_SCRIPT; }
-        ScriptCallback(UserClass *pObject) : base_type(pObject) { m_type = CALLBACK_SCRIPT; }
-        ScriptCallback(util::BindInfo *pBinding) : base_type(pBinding) { m_type = CALLBACK_SCRIPT; }
-        ScriptCallback(util::BindInfo *pBinding, UserClass *pObject) : base_type(pBinding, pObject) { m_type = CALLBACK_SCRIPT; }
+        ScriptCallback() : base_type(), m_nativeFunction(), m_context(), m_script() { m_type = CALLBACK_SCRIPT; }
+        ScriptCallback(UserClass *pObject) : base_type(pObject), m_nativeFunction(), m_context(), m_script() { m_type = CALLBACK_SCRIPT; }
+        ScriptCallback(util::BindInfo *pBinding) : base_type(pBinding), m_nativeFunction(), m_context(), m_script() { m_type = CALLBACK_SCRIPT; }
+        ScriptCallback(util::BindInfo *pBinding, UserClass *pObject) : base_type(pBinding, pObject), m_nativeFunction(), m_context(), m_script() { m_type = CALLBACK_SCRIPT; }
 
     public:
         virtual ~ScriptCallback()
         {
             m_nativeFunction.Reset();
+            m_context.Reset();
         }
 
         virtual bool operator()(void) const override
@@ -111,11 +114,133 @@ namespace script
             return new self_type(new util::BindInfoMethod<UserClass, bool, const util::WrappedArgs &>("callback", methodMember, {}), pObject);
         }
 
+        static self_type *create(ScriptMethod methodMember, v8::Isolate *isolate, const LocalFunction &function, UserClass *pObject = nullptr)
+        {
+            auto callback = self_type::create(methodMember, pObject);
+            callback->setNativeFunction(isolate, function);
+            return callback;
+        }
+
+        static self_type *create(ScriptMethod methodMember, v8::Isolate *isolate, const LocalString &script, UserClass *pObject = nullptr)
+        {
+            auto callback = self_type::create(methodMember, pObject);
+            callback->setScriptSource(v8pp::from_v8<std::string>(isolate, script.As<v8::Value>()));
+            return callback;
+        }
+
+        virtual bool evaluate(v8::Isolate *isolate, const util::WrappedArgs &args, int numArgs)
+        {
+            if (!isolate)
+                return false;
+            v8::HandleScope handle_scope(isolate);
+            auto context = isolate->GetEnteredContext();
+            if (isFunction())
+            {
+                auto function = this->m_nativeFunction.Get(isolate);
+                // convert wrapped args into an array of local values to be used as inputs to JS function
+                // it requires a map/array of converters because type information is lost when values is wrapped
+                util::WrappedArgs registeredArgs; // any external pointers that have been registered with V8 are placed here - these are temporary
+                std::unique_ptr<LocalValue> argv(argsToPointer(isolate, args, registeredArgs, numArgs));
+                // need to figure out if using 'this' as global is ok, or can it be undefined
+                auto result = function->Call(context, context->Global(), static_cast<int>(args.size()), argv.get());
+                unregisterArgs(isolate, registeredArgs); // release any temporary objects from V8 - any handles will be invalidated
+                return true;
+            }
+            else if (isScriptEval())
+            {
+                auto source =
+                    v8::String::NewFromUtf8(isolate, this->m_script.c_str(), v8::NewStringType::kNormal)
+                        .ToLocalChecked();
+                auto maybeScript = v8::Script::Compile(context, source);
+                if (!maybeScript.IsEmpty())
+                {
+                    auto script = maybeScript.ToLocalChecked();
+                    auto result = script->Run(context);
+                }
+                return true;
+            }
+            return false;
+        } //> evaluate(...)
+
     protected:
         PersistentFunction m_nativeFunction;
+        PersistentContext m_context;
         std::string m_script;
     }; //# class ScriptCallback
+    //#-----------------------------------------------------------------------------------
 
+    class ScriptTimerCallback : public ScriptCallback
+    {
+    public:
+        friend class ScriptManager;
+        using base_type = ScriptCallback;
+        using self_type = ScriptTimerCallback;
+
+        // This is the only compatible wrapper for handling script callbacks.
+        // unpack_caller helper from utils already has a specialization to pass-through
+        // wrapped arguments vector if the type matches, so it's possible to have universal
+        // callback for many different input types (events, custom timer parameters etc.)
+        using ScriptMethod = bool (UserClass::*)(const util::WrappedArgs &);
+
+    protected:
+        ScriptTimerCallback() : base_type(), m_v8Arguments() { m_type = CALLBACK_SCRIPT_TIMER; }
+        ScriptTimerCallback(UserClass *pObject) : base_type(pObject), m_v8Arguments() { m_type = CALLBACK_SCRIPT_TIMER; }
+        ScriptTimerCallback(util::BindInfo *pBinding) : base_type(pBinding), m_v8Arguments() { m_type = CALLBACK_SCRIPT_TIMER; }
+        ScriptTimerCallback(util::BindInfo *pBinding, UserClass *pObject) : base_type(pBinding, pObject), m_v8Arguments() { m_type = CALLBACK_SCRIPT_TIMER; }
+
+    public:
+        virtual ~ScriptTimerCallback()
+        {
+            for (auto arg : m_v8Arguments)
+            {
+                arg.Reset();
+            }
+            m_v8Arguments.clear();
+        }
+
+        inline void setArguments(v8::Isolate *isolate, std::vector<LocalValue> const &args)
+        {
+            for (auto arg : args)
+            {
+                m_v8Arguments.push_back(PersistentValue::Persistent(isolate, arg));
+            } //# for each input argument
+        }
+
+    protected:
+        static self_type *create(ScriptMethod methodMember, UserClass *pObject = nullptr)
+        {
+            return new self_type(new util::BindInfoMethod<UserClass, bool, const util::WrappedArgs &>("callback-timer", methodMember, {}), pObject);
+        }
+
+        static self_type *create(ScriptMethod methodMember, v8::Isolate *isolate, const LocalFunction &function, UserClass *pObject = nullptr)
+        {
+            auto callback = self_type::create(methodMember, pObject);
+            callback->setNativeFunction(isolate, function);
+            return callback;
+        }
+
+        virtual bool evaluate(v8::Isolate *isolate, const util::WrappedArgs &args, int numArgs)
+        {
+            if (!isolate)
+                return false;
+            if (isScriptEval())
+                return base_type::evaluate(isolate, args, numArgs);
+            v8::HandleScope handle_scope(isolate);
+            auto context = isolate->GetEnteredContext(); // FIXME
+            {
+                auto function = m_nativeFunction.Get(isolate);
+                if (!function->IsFunction())
+                    return false; //! skip
+                std::unique_ptr<LocalValue> argv(script::argsToPointer(isolate, m_v8Arguments));
+                auto result = function->Call(context, context->Global(), static_cast<int>(m_v8Arguments.size()), argv.get());
+            }
+            return true;
+        } //> evaluate(...)
+
+    protected:
+        std::vector<PersistentValue> m_v8Arguments;
+    }; //# class ScriptTimerCallback
+    //#-----------------------------------------------------------------------------------
 } //> namespace script
 
 namespace util
