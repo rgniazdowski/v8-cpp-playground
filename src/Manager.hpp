@@ -56,7 +56,7 @@ namespace base
     //#-----------------------------------------------------------------------------------
 
     template <class TManagerType>
-    class Manager : virtual public ManagerBase
+    class Manager : public ManagerBase
     {
     private:
         inline static uint64_t s_instanceId = 0;

@@ -185,7 +185,11 @@ bool resource::DataManagerBase<THandleType>::insert(data_type *pData, std::strin
 template <typename THandleType>
 bool resource::DataManagerBase<THandleType>::rename(data_type *pData, std::string_view nameTag)
 {
-    return true;
+    const auto &handle = pData->getHandle();
+    auto status = handle_mgr_type::rename(handle, std::string(nameTag));
+    if (status)
+        pData->setName(nameTag);
+    return status;
 }
 
 template <typename THandleType>

@@ -4,9 +4,18 @@
 
 #include <util/Tag.hpp>
 
+namespace resource
+{
+    template <typename THandleType>
+    class ManagedObject;
+} //> namespace resource
+
 namespace util
 {
     struct HandleHelper;
+
+    template <typename THandleType>
+    class HandleManager;
     class HandleBase
     {
         friend struct HandleHelper;
@@ -37,7 +46,6 @@ namespace util
                     uint32_t m_magic : MAX_BITS_MAGIC; /* read only */
                 };
             };
-            uint32_t m_indexTag;
             uint64_t m_handle; /* read only */
         };
         HandleBase() : m_handle(0) {}
@@ -87,15 +95,17 @@ namespace util
         static Unpacked unpack(const HandleBase &handle) { return Unpacked(handle); }
     };
 
-    template <typename TagType>
+    template <typename TTagType>
     class Handle : public HandleBase
     {
-        static_assert(std::is_base_of_v<TagBase, TagType>, "TagType template parameter type needs to be derived from TagBase");
+        static_assert(std::is_base_of_v<TagBase, TTagType>, "TTagType template parameter type needs to be derived from TagBase");
 
     public:
-        using self_type = Handle<TagType>;
-        using type = Handle<TagType>;
-        using tag_type = TagType;
+        using self_type = Handle<TTagType>;
+        using tag_type = TTagType;
+
+        friend class ::util::HandleManager<self_type>;
+        friend class ::resource::ManagedObject<self_type>;
 
     public:
         Handle() : HandleBase(0, tag_type::id(), 0) {}
@@ -104,20 +114,26 @@ namespace util
         Handle(const self_type &other)
         {
             m_handle = other.m_handle;
-            m_tag = tag_type::id(); // setup tag (back to proper if overwritten)
+            // setup tag (back to proper if overwritten)
+            m_tag = tag_type::id();
         }
         virtual ~Handle() { m_handle = 0; }
 
+        static const char *getTagName(void) { return tag_type::name(); }
+
+    protected:
         self_type &operator=(const self_type &other)
         {
             m_handle = other.m_handle;
-            m_tag = tag_type::id(); // setup tag (back to proper if overwritten)
+            // setup tag (back to proper if overwritten)
+            m_tag = tag_type::id();
             return *this;
         }
 
         self_type &operator=(uint64_t handle)
         {
             this->m_handle = handle;
+            // setup tag (back to proper if overwritten)
             m_tag = tag_type::id();
             return *this;
         }
@@ -138,9 +154,7 @@ namespace util
             m_index = index;
             return true;
         }
-
-        static const char *getTagName(void) { return tag_type::name(); }
-    }; //# class Handle<TagType>
+    }; //# class Handle<TTagType>
 
     class ObjectWithIdentifier
     {

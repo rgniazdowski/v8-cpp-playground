@@ -60,7 +60,7 @@ namespace resource
 
         void goToBegin(void) { m_currentResource = getDataVector().begin(); }
 
-        Resource *getCurrentResource(void) { return (!isValid() ? NULL : (*m_currentResource).data); }
+        Resource *getCurrentResource(void) { return (!isValid() ? NULL : const_cast<Resource *>((*m_currentResource).data)); }
 
         bool isValid(void) { return (m_currentResource != getDataVector().end()); }
 

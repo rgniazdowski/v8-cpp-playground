@@ -216,7 +216,7 @@ namespace util
         void set(std::string_view nameTag)
         {
             static_assert(std::is_base_of<TagBase, TagType>::value, "TagType template parameter type needs to be derived from TagBase");
-            set<TagType>(nameTag, TagType::id());
+            set<TagType>(nameTag, m_index);
         }
 
         template <typename TagType>

@@ -19,8 +19,12 @@ namespace logger
         Fatal = 5,
         Off = 6
     };
+#if defined(FG_DEBUG)
+    inline extern Level level = Level::All;
+#else
     inline extern Level level = Level::Info;
-    const unsigned int BUFFER_MAX = 4096;
+#endif
+    const unsigned int BUFFER_MAX = 16384;
 
     unsigned int PrintLog(const char *prefix, const Level level, const char *fmt, ...);
     unsigned int PrintLog(const Level level, const char *fmt, ...);
@@ -51,11 +55,15 @@ namespace logger
         return PrintLog(Level::Error, fmt, args...);
     }
 
-    template <class TagType, Level DefaultLevel = Level::Info>
+#if defined(FG_DEBUG)
+    template <class TTagType, Level DefaultLevel = Level::All>
+#else
+    template <class TTagType, Level DefaultLevel = Level::Info>
+#endif
     struct Logger
     {
-        static_assert(std::is_base_of<util::TagBase, TagType>::value, "TagType template parameter type needs to be derived from TagBase");
-        using tag_type = TagType;
+        static_assert(std::is_base_of<util::TagBase, TTagType>::value, "TagType template parameter type needs to be derived from TagBase");
+        using tag_type = TTagType;
         using user_type = typename tag_type::user_type;
 
         static inline Level level = DefaultLevel;

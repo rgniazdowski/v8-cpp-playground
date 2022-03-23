@@ -28,6 +28,8 @@ bool resource::ResourceManager::destroy(void)
 {
     if (!isInit())
         return false;
+    m_thread.stop();
+    m_init = false;
     return true;
 }
 //>---------------------------------------------------------------------------------------
@@ -38,6 +40,7 @@ bool resource::ResourceManager::initialize(void)
         return true;
     m_dataDir.read(".", true, true);
     m_dataDir.rewind();
+    m_init = true;
     return true;
 }
 //>---------------------------------------------------------------------------------------
@@ -461,7 +464,7 @@ bool resource::ResourceManager::checkForOverallocation(void)
             addMemory((*itor).data->getSize());
             // if (!(*itor).data->isDisposed() && !(*itor).data->isLocked())
             if (!(*itor).data->isDisposed())
-                priorityResQ.push((*itor).data);
+                priorityResQ.push(const_cast<Resource *>((*itor).data));
         }
         // Attempt to remove iMemToPurge bytes from the managed resource
         const auto iMemToPurge = m_nCurrentUsedMemory - m_nMaximumMemory;

@@ -20,7 +20,6 @@ namespace resource
 
         ManagedObjectBase(const self_type &orig)
         {
-            // m_pManager = orig.m_pManager;
             m_nameTag = orig.m_nameTag;
             m_isManaged = orig.m_isManaged;
         }
@@ -91,17 +90,14 @@ namespace resource
     protected:
         ManagedObject() : ManagedObjectBase(), m_handle() {}
 
-        ManagedObject(const self_type &orig)
-        {
-            m_handle = orig.m_handle;
-        }
-
         virtual ~ManagedObject() {}
 
     protected:
         inline void setName(std::string_view name)
         {
-            m_nameTag.set<tag_type>(name); // index should stay untouched
+            // index should stay untouched
+            m_nameTag.set<tag_type>(name);
+            // m_handle = handle_type(m_nameTag.getIndex(), m_nameTag.getHash()); // overwrite fully
         }
 
         inline void setHandle(const handle_type &handle)
@@ -109,6 +105,13 @@ namespace resource
             // just get index, everything else is untouched
             m_nameTag.set<tag_type>(handle.getIndex());
             m_handle = handle; // overwrite fully
+            // m_handle = handle_type(handle.getIndex(), m_nameTag.getHash()); // overwrite fully
+        }
+
+        inline void resetHandle(void)
+        {
+            m_handle = 0;
+            m_nameTag.set("", 0);
         }
 
         inline handle_type &getHandle(void) { return m_handle; }
@@ -118,18 +121,13 @@ namespace resource
         inline util::HandleBase const &getHandleBase(void) const override { return m_handle; }
         inline uint64_t getIdentifier(void) const override { return m_handle.getHandle(); }
 
-        // inline fg::base::CManager *getManager(void) const { return m_pManager; }
-        // inline void setManager(fg::base::CManager *pManager) { m_pManager = pManager; }
-
     protected:
-        // fg::base::CManager *m_pManager;
-        //
         // Handle is partially separate from a named handle meaning that the managed object
         // has both to identify it, both contain 'index' and 'tag' parts (which are equal),
         // but hash/magic part is different - in any case, a handle should be setup once
         // and changing the name should update only the 'hash' part.
         handle_type m_handle;
-    }; //# class ManagedObject
+    }; //# class ManagedObject<THandleType>
 } //> namespace resource
 
 #endif //> FG_INC_MANAGED_OBJECT

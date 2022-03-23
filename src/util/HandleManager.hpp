@@ -5,6 +5,7 @@
 #include <util/Vector.hpp>
 #include <util/Handle.hpp>
 #include <util/NamedHandle.hpp>
+#include <util/Logger.hpp>
 #include <unordered_map>
 #include <functional>
 
@@ -21,6 +22,8 @@ namespace util
         using tag_type = typename handle_type::tag_type;
         using data_type = typename tag_type::user_type;
         using self_type = HandleManager<handle_type>;
+        using self_tag_type = util::Tag<self_type>;
+        using logger = logger::Logger<self_tag_type>;
         using HashKeyString = std::string;
 
         /// Special Name map - maps std::string to the index
@@ -34,7 +37,7 @@ namespace util
          */
         struct DataHolder
         {
-            data_type *data;
+            const data_type *data;
             // this is just the magic part of a number-only handle, which should be immutable
             // meaning that once assigned to a given object - it shouldn't update
             uint32_t magic;
@@ -77,9 +80,10 @@ namespace util
 
         virtual ~HandleManager() { releaseAllHandles(); }
 
-        bool acquireHandle(handle_type &rHandle, data_type *pResource);
+        bool rename(const handle_type &rHandle, const std::string &newName);
 
-        bool setupName(const std::string &name, const handle_type &rHandle);
+        bool acquireHandle(handle_type &rHandle, const data_type *pData);
+        bool setupName(const std::string &name, const handle_type &rHandle, bool forced = false);
 
         bool releaseHandle(const handle_type &handle);
         void releaseAllHandles(void);
@@ -98,13 +102,26 @@ namespace util
 
         bool isDataManaged(data_type *pData);
         bool isHandleValid(const handle_type &handle);
+
+        static const char *getTagName(void) { return tag_type::name(); }
     }; //# class HandleManager<THandleType>
 
 } //> namespace util
 //#---------------------------------------------------------------------------------------
 
 template <typename THandleType>
-bool util::HandleManager<THandleType>::acquireHandle(handle_type &rHandle, data_type *pResource)
+bool util::HandleManager<THandleType>::rename(const handle_type &rHandle, const std::string &newName)
+{
+    if (!isHandleValid(rHandle))
+        return false;
+    if (m_nameMap.find(newName) != m_nameMap.end())
+        return false; // cannot overwrite existing handle!
+    return setupName(newName, rHandle, true);
+}
+//>---------------------------------------------------------------------------------------
+
+template <typename THandleType>
+bool util::HandleManager<THandleType>::acquireHandle(handle_type &rHandle, const data_type *pData)
 {
     // If free list is empty, add a new one otherwise use first one found
     uint32_t index;
@@ -114,7 +131,7 @@ bool util::HandleManager<THandleType>::acquireHandle(handle_type &rHandle, data_
         if (!rHandle.init(index))
             return false;
         DataHolder holder;
-        holder.data = pResource;
+        holder.data = pData;
         holder.magic = rHandle.getMagic();
         holder.nameTag.set<tag_type>(index);
         m_managedData.push_back(holder);
@@ -126,7 +143,7 @@ bool util::HandleManager<THandleType>::acquireHandle(handle_type &rHandle, data_
             return false;
         m_freeSlots.pop_back();
         auto &holder = m_managedData[index];
-        holder.data = pResource;
+        holder.data = pData;
         holder.magic = rHandle.getMagic();
         holder.nameTag.set<tag_type>(index);
     }
@@ -135,33 +152,26 @@ bool util::HandleManager<THandleType>::acquireHandle(handle_type &rHandle, data_
 //>---------------------------------------------------------------------------------------
 
 template <typename THandleType>
-bool util::HandleManager<THandleType>::setupName(const std::string &name, const handle_type &rHandle)
+bool util::HandleManager<THandleType>::setupName(const std::string &name, const handle_type &rHandle, bool forced)
 {
     if (!isHandleValid(rHandle))
     {
+        logger::error("Input handle is not valid (not acquired) - index[%u], name[%s]",
+                      rHandle.getIndex(), name.c_str());
         return false;
     }
     auto index = rHandle.getIndex();
-    // auto tag = rHandle.getTag();
     if (m_nameMap.find(name) != m_nameMap.end())
     {
-        // FG_LOG_ERROR("HandleManager[%s] Such key already exists in name map - index[%u], name_tag[%s]",
-        //              THandleType::getTagName(),
-        //              index,
-        //              name.c_str());
+        logger::error("Such key already exists in name map - index[%u], name[%s]",
+                      index, name.c_str());
         return false; // Such key already exists
     }
     auto &holder = m_managedData[index];
-    if (holder.magic != rHandle.getMagic())
+    if (!holder.nameTag.empty() && !forced)
     {
-        return false; // invalid?
-    }
-    if (!holder.nameTag.empty())
-    {
-        // FG_LOG_ERROR("HandleManager[%s]: There is name tag already in the vector - index[%u], name_tag[%s]",
-        //              THandleType::getTagName(),
-        //              index,
-        //              name.c_str());
+        logger::error("There is name tag already in the vector - index[%u], name[%s]",
+                      index, name.c_str());
         //  There is already some set on the current index
         return false;
     }
@@ -190,11 +200,7 @@ bool util::HandleManager<THandleType>::setupName(const std::string &name, const 
     // assign new name/hash to index
     m_nameMap[name] = index;
     m_hashMap[hash] = index;
-    // FG_LOG_DEBUG("HandleManager[%s]: Setup name[%s], hash[%10u], index[%u]",
-    //              THandleType::getTagName(),
-    //              name.c_str(),
-    //              hash,
-    //              index);
+    logger::trace("Setup name[%s], hash[%10u], index[%u]", name.c_str(), hash, index);
     return true;
 }
 //>---------------------------------------------------------------------------------------
@@ -204,7 +210,7 @@ bool util::HandleManager<THandleType>::releaseHandle(const handle_type &rHandle)
 {
     if (!isHandleValid(rHandle))
     {
-        // FG_LOG_DEBUG("HandleManager[%s]: can't release handle - handle is invalid, tag_name[%s]", THandleType::getTagName(), THandleType::getTagName());
+        logger::debug("Can't release handle - handle is invalid, tag_name[%s]", getTagName());
         return false;
     }
     // which one?
@@ -212,12 +218,9 @@ bool util::HandleManager<THandleType>::releaseHandle(const handle_type &rHandle)
     // auto tag = rHandle.getTag();
     //  ok remove it - tag as unused and add to free list
     auto &holder = m_managedData[index];
-    // FG_LOG_DEBUG("HandleManager[%s]: Releasing handle: index[%d], magic[%d], handle[%d], name[%s]",
-    //              THandleType::getTagName(),
-    //              index,
-    //              handle.getMagic(),
-    //              handle.getHandle(),
-    //              m_managedData[index].nameTag.c_str());
+    logger::debug("Releasing handle: index[%d], magic[%llu], handle[%d], name[%s]",
+                  index, rHandle.getMagic(), rHandle.getHandle(),
+                  m_managedData[index].nameTag.c_str());
     if (!holder.nameTag.empty())
         m_nameMap.erase(holder.nameTag);
     auto hash = holder.nameTag.getHash();
@@ -248,7 +251,8 @@ typename util::HandleManager<THandleType>::data_type *util::HandleManager<THandl
         return nullptr;
     if (handle.getTag() != tag_type::id())
         return nullptr;
-    return (*(m_managedData.begin() + handle.getIndex())).data;
+    auto data = (*(m_managedData.begin() + handle.getIndex())).data;
+    return const_cast<data_type *>(data);
 }
 //>---------------------------------------------------------------------------------------
 
@@ -273,7 +277,7 @@ typename util::HandleManager<THandleType>::data_type *util::HandleManager<THandl
         return nullptr;
     DataHolder &holder = m_managedData[index];
     if (holder.nameTag.getHash() == nameTag.getHash())
-        return holder.data;
+        return const_cast<data_type *>(holder.data);
     return nullptr;
 }
 //>---------------------------------------------------------------------------------------
@@ -290,7 +294,7 @@ typename util::HandleManager<THandleType>::data_type *util::HandleManager<THandl
             return nullptr;
         DataHolder &holder = m_managedData[index];
         if (holder.nameTag.getHash() == name.getHash())
-            return holder.data;
+            return const_cast<data_type *>(holder.data);
     }
     else
     {
@@ -309,7 +313,7 @@ typename util::HandleManager<THandleType>::data_type *util::HandleManager<THandl
             return nullptr;
         name.set<tag_type>(index);
         DataHolder &holder = m_managedData[index];
-        return holder.data;
+        return const_cast<data_type *>(holder.data);
     }
     return nullptr;
 }
@@ -335,18 +339,17 @@ bool util::HandleManager<THandleType>::isHandleValid(const handle_type &handle)
     // check handle validity - $ this check can be removed for speed
     // if you can assume all handle references are always valid.
     auto index = handle.getIndex();
-    if (index >= m_managedData.size())
-        return false;
-    DataHolder &holder = m_managedData[index];
-    if (holder.nameTag.getHash() != handle.getHash())
+    // DataHolder &holder = m_managedData[index];
+    //  if (holder.nameTag.getHash() != handle.getHash())
+    if ((index >= m_managedData.size()) || (m_managedData[index].magic != handle.getMagic()))
     {
         // no good! invalid handle == client programming error
-        // FG_LOG_DEBUG("HandleManager[%s]: invalid handle, magic numbers don't match: index[%d], magic[%d], handle[%d], true_magic[%d]",
-        //             THandleType::getTagName(),
-        //             index,
-        //             handle.getMagic(),
-        //             handle.getHandle(),
-        //             m_managedData[index].magic);
+        logger::error("Invalid handle, magic numbers don't match: index[%d], magic[%d], handle[%llu], true_magic[%d], hash[%lu]",
+                      index,
+                      handle.getMagic(),
+                      handle.getHandle(),
+                      m_managedData[index].magic,
+                      m_managedData[index].nameTag.getHash());
         return false;
     }
     return true;
@@ -362,5 +365,4 @@ const DataType* HandleManager <DataType, HandleType>
     return ( const_cast<ThisType*>(this)->Dereference(handle));
 }
 #endif
-
 #endif //> FG_INC_HANDLE_MANAGER

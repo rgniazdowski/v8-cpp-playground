@@ -92,7 +92,6 @@ namespace resource
 
     public:
         virtual bool create(void) = 0;
-        virtual void destroy(void) { Resource::clear(); };
 
         virtual bool recreate(void) = 0;
         virtual void dispose(void) = 0;
