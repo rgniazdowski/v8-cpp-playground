@@ -33,7 +33,9 @@ EngineMain::EngineMain(int argc, char **argv) : base_type(),
         this->m_frameControl.process(true, this, &EngineMain::update);
         return true; });
     m_thread.setWakeable(false);
-    base::ManagerRegistry::instance()->add(this); // Event Manager
+    // base::ManagerRegistry::instance()->add(this);
+    //  Add the engine main as event manager to this registry (it is anyway) - Manager<EventManager> matters only
+    base::ManagerRegistry::instance()->add(static_cast<event::EventManager *>(this));
     m_thread.setThreadName("EngineMain");
 }
 //>---------------------------------------------------------------------------------------
@@ -100,17 +102,17 @@ bool EngineMain::initialize(void)
         return true;
     if (!m_resourceMgr)
         m_resourceMgr = new resource::ResourceManager(this);
+    base::ManagerRegistry::instance()->add(m_resourceMgr);
     m_resourceMgr->setMaximumMemory(128 * 1024 * 1024 - 1024 * 1024 * 10); // #FIXME #TODO
     m_resourceMgr->initialize();
+    setEventManager(); // FIXME
     m_scriptMgr = script::ScriptManager::instance(m_argv);
+    base::ManagerRegistry::instance()->add(m_scriptMgr); // Add Script Manager to the registry
     m_scriptMgr->initialize();
-    setEventManager();
     m_init = true;
     this->startThread();
     m_resourceMgr->startThread();
     m_scriptMgr->startThread();
-    base::ManagerRegistry::instance()->add(m_resourceMgr); // Resource Manager
-    base::ManagerRegistry::instance()->add(m_scriptMgr);   // Script Manager
     return true;
 }
 //>---------------------------------------------------------------------------------------

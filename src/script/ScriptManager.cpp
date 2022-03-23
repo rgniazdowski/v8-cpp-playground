@@ -1,6 +1,8 @@
 #include <script/ScriptManager.hpp>
 #include <script/ScriptCallback.hpp>
+#include <script/ScriptResource.hpp>
 #include <script/modules/Console.hpp>
+#include <script/modules/Timers.hpp>
 #include <v8pp/convert.hpp>
 
 #include <event/EventManager.hpp>
@@ -81,11 +83,51 @@ bool script::ScriptManager::initialize(void)
             console->initialize();
             registerModule(console);
         }
+        {
+            // Timers wrapped - create callbacks and timers on EventManager
+            auto timers = new modules::Timers(m_isolate);
+            timers->s_pScriptMgr = this;
+            timers->initialize();
+            registerModule(timers);
+        }
         // Create a new context.
         // Main context is registered - now can create and manage all global objects before
         // entering (in another thread) a special event loop for microtasks and callbacks.
         // Globals are also initialized within.
         LocalContext context = createContext("main");
+    }
+    // Try to hook up with Resource Manager and request a resource from it, in this case
+    // it's important to try and find the 'main' module / script - an entry point for the
+    // whole application - this module would trigger any other required code (via import).
+    auto managerRegistry = base::ManagerRegistry::instance();
+    auto resourceMgr = managerRegistry->get<resource::ResourceManager>();
+    auto eventMgr = managerRegistry->get<event::EventManager>();
+    if (resourceMgr != nullptr)
+    {
+        auto factory = resourceMgr->getResourceFactory();
+        factory->registerObjectType<ScriptResource>("js;mjs");
+        //! FIXME - this should happen on the thread and possibly the script resource
+        //! should contain a valid 'Module' object (depending on type) that would get
+        //! correctly compiled and executed on correct thread.
+        //* The create() action on ScriptResource should just load the file content,
+        //* compilation and execution has to be done explictly (and only once).
+        //* Additionally, each ScriptResource should get auto-locked, so dispose() is not
+        //* called at all on it.
+        auto mainScript = resourceMgr->request("main.js", ScriptResource::SelfResourceId);
+        if (!mainScript)
+            mainScript = resourceMgr->request("main.mjs", ScriptResource::SelfResourceId);
+        resourceMgr->rename(mainScript, "main-module");
+        util::NamedHandle xd("main-module");
+        auto x1 = resourceMgr->get("main-module");
+        auto x2 = resourceMgr->get(xd);
+        //? Could possibly add a script callback to process the code/modules on ProgramInit
+        //? event - then the ScriptCallback custom handler (executed on event thread) would
+        //? push actions to be triggered later on the desired target thread.
+        // eventMgr->addCallback(event::Type::ProgramInit);
+        //! FIXME
+        auto callback = ScriptCallback::create(&ScriptManager::scriptCallbackHandler, this);
+        callback->m_script = static_cast<ScriptResource *>(mainScript)->getContent();
+        (*callback)();
     }
     m_init = true;
     return true;

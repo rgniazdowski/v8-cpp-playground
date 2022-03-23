@@ -14,7 +14,7 @@ namespace script::modules
         using base_type = ::script::InternalModule;
 
     public:
-        Console(v8::Isolate *isolate) : base_type(isolate, "console"), m_module(isolate)
+        Console(v8::Isolate *isolate) : base_type(isolate, "console-internal"), m_module(isolate)
         {
             setMode(BuiltinGlobalsOnly);
         }
