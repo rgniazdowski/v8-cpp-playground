@@ -142,7 +142,7 @@ namespace script
                 util::WrappedArgs registeredArgs; // any external pointers that have been registered with V8 are placed here - these are temporary
                 std::unique_ptr<LocalValue> argv(argsToPointer(isolate, args, registeredArgs, numArgs));
                 // need to figure out if using 'this' as global is ok, or can it be undefined
-                auto result = function->Call(context, context->Global(), static_cast<int>(args.size()), argv.get());
+                auto result = function->Call(context, context->Global(), numArgs, argv.get());
                 unregisterArgs(isolate, registeredArgs); // release any temporary objects from V8 - any handles will be invalidated
                 return true;
             }

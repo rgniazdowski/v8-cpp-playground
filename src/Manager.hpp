@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <mutex>
+#include <atomic>
 
 #include <Singleton.hpp>
 #include <util/Handle.hpp>
@@ -21,9 +22,9 @@ namespace base
         virtual bool initialize(void) = 0;
         inline uint32_t getManagerId(void) const { return m_managerId; };
 
-        constexpr bool isInit(void) const noexcept { return m_init; }
+        bool isInit(void) const noexcept { return m_init.load(); }
 
-        ManagerBase(uint32_t managerId = 0, uint64_t identifier = 0) : m_init(false),
+        ManagerBase(uint32_t managerId = 0, uint64_t identifier = 0) : m_init(),
                                                                        m_managerId(managerId),
                                                                        m_instanceId(identifier),
                                                                        m_thread(*this) {}
@@ -46,7 +47,7 @@ namespace base
         inline uint64_t getIdentifier(void) const override { return m_instanceId; };
 
     protected:
-        bool m_init;
+        std::atomic_bool m_init;
         util::SimpleThread &m_thread;
 
     private:

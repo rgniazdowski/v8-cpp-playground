@@ -3,10 +3,11 @@
 #define FG_INC_KEYBOARD
 
 #include <util/EnumFlags.hpp>
+#include <magic_enum.hpp>
 
 namespace event
 {
-    enum class KeyCode : unsigned int
+    enum class KeyCode : unsigned short
     {
         UNKNOWN = 0,
         NONE = 0,
@@ -248,4 +249,13 @@ namespace event
 
     ENUM_FLAGS(KeyMod);
 } //> namespace event
+
+template <>
+struct magic_enum::customize::enum_range<event::KeyCode>
+{
+    static constexpr int min = 0;
+    static constexpr int max = 256;
+    // (max - min) must be less than UINT16_MAX.
+};
+
 #endif //> FG_INC_KEYBOARD

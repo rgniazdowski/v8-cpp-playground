@@ -84,6 +84,13 @@ namespace util
             m_function = function;
         }
 
+        bool runJustOnce(void)
+        {
+            if (!m_function)
+                return false;
+            return m_function();
+        }
+
         bool start(void)
         {
             if (!m_function)

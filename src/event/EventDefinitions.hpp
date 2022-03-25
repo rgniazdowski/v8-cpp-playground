@@ -12,6 +12,8 @@
 namespace resource
 {
     class Resource;
+    using ResourceTag = ::util::Tag<Resource>;
+    using ResourceHandle = ::util::Handle<ResourceTag>;
 }
 
 /*namespace gui {
@@ -221,12 +223,12 @@ namespace event
 
         enum Direction
         {
-            INVALID,
-            LEFT,
-            RIGHT,
-            UP,
-            DOWN,
-            ANGLE
+            Invalid,
+            Left,
+            Right,
+            Up,
+            Down,
+            Angle
         } swipeDirection;
         int xStart;
         int yStart;
@@ -239,40 +241,18 @@ namespace event
 
         const char *getDirectionAsString(void) const
         {
-            const char *result = "Invalid";
-            switch (swipeDirection)
-            {
-            case LEFT:
-                result = "Left";
-                break;
-            case RIGHT:
-                result = "Right";
-                break;
-            case UP:
-                result = "Up";
-                break;
-            case DOWN:
-                result = "Down";
-                break;
-            case ANGLE:
-                result = "Angle";
-                break;
-
-            default:
-                break;
-            } // switch(...)
-            return result;
+            auto name = magic_enum::enum_name<Direction>(swipeDirection);
+            return name.data();
         }
     };
 
     struct EventSwipePinch : EventBase
     {
-
         enum Direction
         {
-            INVALID,
-            IN,
-            OUT
+            Invalid,
+            In,
+            Out
         } pinchDirection;
         int x;
         int y;
@@ -281,6 +261,12 @@ namespace event
         int pinchXOffset;
         int pinchYOffset;
         int pinchSize;
+
+        const char *getDirectionAsString(void) const
+        {
+            auto name = magic_enum::enum_name<Direction>(pinchDirection);
+            return name.data();
+        }
     };
 
     struct EventSwipeRotate : EventBase
@@ -393,13 +379,19 @@ namespace event
     {
         enum Status
         {
-            CREATED,
-            REMOVED,
-            DISPOSED,
-            DESTROYED,
-            REQUESTED
+            Created,
+            Removed,
+            Disposed,
+            Destroyed,
+            Requested
         } status;
-        resource::Resource *resource;
+        resource::ResourceHandle handle;
+
+        const char *getStatusAsString(void) const
+        {
+            auto name = magic_enum::enum_name<Status>(status);
+            return name.data();
+        }
     };
 
     struct EventProgram : EventBase
@@ -410,7 +402,6 @@ namespace event
 
     struct EventLoading : EventBase
     {
-
         enum Status
         {
             BEGIN = 0,
@@ -504,9 +495,41 @@ namespace event
         int n_data;
     };
 
-    struct EventCombined
+    struct EventCombined : public util::ObjectWithIdentifier
     {
-        EventCombined(Type eventType) : eventType(eventType) {}
+        EventCombined(Type type) : eventType(type), timeStamp(timesys::ticks()), identifier(EventCombined::autoid())
+        {
+            swipe.xStart = 0;
+            swipe.yStart = 0;
+            swipe.xEnd = 0;
+            swipe.yEnd = 0;
+            swipe.swipeXOffset = 0;
+            swipe.swipeYOffset = 0;
+            swipe.swipeXSteps = 0;
+            swipe.swipeYSteps = 0;
+        }
+        ~EventCombined()
+        {
+            eventType = Type::Invalid;
+            timeStamp = 0;
+            identifier = 0;
+        }
+        inline void setup(Type type)
+        {
+            eventType = type;
+            timeStamp = timesys::ticks();
+            identifier = event::EventCombined::autoid();
+            swipe.xStart = 0;
+            swipe.yStart = 0;
+            swipe.xEnd = 0;
+            swipe.yEnd = 0;
+            swipe.swipeXOffset = 0;
+            swipe.swipeYOffset = 0;
+            swipe.swipeXSteps = 0;
+            swipe.swipeYSteps = 0;
+        }
+        inline uint64_t getIdentifier(void) const override { return identifier; }
+        inline static uint64_t autoid(void) { return EventBase::autoid(); }
         union
         {
             struct

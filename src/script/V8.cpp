@@ -50,6 +50,7 @@ script::LocalValue *script::argsToPointer(v8::Isolate *isolate, util::WrappedArg
             registeredArgs.push_back(pWrapped);
         }
         auto value = converter->convert(isolate, wrapped);
+        argv[idx] = value;
     } //# for each original argument
     return argv;
 }

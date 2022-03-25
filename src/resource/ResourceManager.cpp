@@ -1,5 +1,6 @@
 #include <resource/ResourceManager.hpp>
 #include <resource/ResourceConfigJson.hpp>
+#include <event/EventManager.hpp>
 #include <util/Util.hpp>
 #include <util/File.hpp>
 #include <util/JsonFile.hpp>
@@ -29,7 +30,7 @@ bool resource::ResourceManager::destroy(void)
     if (!isInit())
         return false;
     m_thread.stop();
-    m_init = false;
+    m_init.store(false);
     return true;
 }
 //>---------------------------------------------------------------------------------------
@@ -40,7 +41,7 @@ bool resource::ResourceManager::initialize(void)
         return true;
     m_dataDir.read(".", true, true);
     m_dataDir.rewind();
-    m_init = true;
+    m_init.store(true);
     return true;
 }
 //>---------------------------------------------------------------------------------------
@@ -222,17 +223,11 @@ resource::Resource *resource::ResourceManager::refreshResource(Resource *pResour
         pResource->recreate();
         if (!pResource->isDisposed() && m_pEventMgr)
         {
-            ////event::SResource *resEvent = fgMalloc<event::SResource>();
-            // event::SResource *resEvent = (event::SResource*)static_cast<event::CEventManager *>(m_pEventMgr)->requestEventStruct();
-            // event::CArgumentList *argList = static_cast<event::CEventManager *>(m_pEventMgr)->requestArgumentList();
-            // resEvent->eventType = event::RESOURCE_CREATED;
-            // resEvent->timeStamp = timesys::ticks();
-            // resEvent->status = event::SResource::CREATED;
-            // resEvent->resource = pResource;
-            //
-            ////event::CArgumentList *argList = new event::CArgumentList();
-            // argList->push(event::SArgument::Type::ARG_TMP_POINTER, (void *)resEvent);
-            // static_cast<event::CEventManager *>(m_pEventMgr)->throwEvent(event::RESOURCE_CREATED, argList);
+            auto eventMgr = static_cast<event::EventManager *>(m_pEventMgr);
+            auto eventStruct = eventMgr->requestEventStruct<event::EventResource, event::Type::ResourceCreated>();
+            eventStruct->status = event::EventResource::Created;
+            // eventStruct->handle = pResource->getHandle();
+            eventMgr->throwEvent(event::Type::ResourceCreated, eventStruct);
         }
         addMemory(pResource->getSize());
         // check to see if any overallocation has taken place, but
@@ -427,20 +422,14 @@ resource::Resource *resource::ResourceManager::request(std::string_view info, co
         // This will recreate the resource if necessary and throw proper event
         // if the pointer to the external event manager is set.
         ResourceManager::refreshResource(resourcePtr);
-        // if (m_pEventMgr)
-        //{
-        //     // #FIXME ! ! ! !
-        //     // event::SResource *resEvent = fgMalloc<event::SResource>();
-        //     event::SResource *resEvent = (event::SResource *)static_cast<event::CEventManager *>(m_pEventMgr)->requestEventStruct();
-        //     event::CArgumentList *argList = static_cast<event::CEventManager *>(m_pEventMgr)->requestArgumentList();
-        //     resEvent->eventType = event::RESOURCE_REQUESTED;
-        //     resEvent->timeStamp = timesys::ticks();
-        //     resEvent->status = event::SResource::REQUESTED;
-        //     resEvent->resource = resourcePtr;
-        //     // event::CArgumentList *argList = new event::CArgumentList();
-        //     argList->push(event::SArgument::Type::ARG_TMP_POINTER, (void *)resEvent);
-        //     static_cast<event::CEventManager *>(m_pEventMgr)->throwEvent(event::RESOURCE_REQUESTED, argList);
-        // }
+        if (m_pEventMgr)
+        {
+            auto eventMgr = static_cast<event::EventManager *>(m_pEventMgr);
+            auto eventStruct = eventMgr->requestEventStruct<event::EventResource, event::Type::ResourceRequested>();
+            eventStruct->status = event::EventResource::Requested;
+            // eventStruct->handle = pResource->getHandle();
+            eventMgr->throwEvent(event::Type::ResourceRequested, eventStruct);
+        }
     }
     return resourcePtr;
 }

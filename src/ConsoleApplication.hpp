@@ -9,6 +9,7 @@ class ConsoleApplication : public Application<TEngineType>
 {
 public:
     using base_type = Application<TEngineType>;
+    using self_type = ConsoleApplication<TEngineType>;
     using logger = typename base_type::logger;
 
     ConsoleApplication(int argc, char *argv[]) : base_type(argc, argv) {}
@@ -19,6 +20,7 @@ protected:
     {
         return true;
     }
+
     bool postInitStep(void) override
     {
         return true;

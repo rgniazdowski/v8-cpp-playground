@@ -15,7 +15,7 @@ namespace logger
         // struct tm *ti = localtime(&ts);
         localtime_s(&ti, &ts);
 
-        snprintf(pBuffer, BUFFER_MAX - 1, "%02d/%02d/%02d %02d:%02d:%02d.%03d: %7s",
+        snprintf(pBuffer, BUFFER_MAX - 1, "%02d-%02d-%02d %02d:%02d:%02d.%03d [%7s] ",
                  ti.tm_mday,
                  ti.tm_mon + 1,
                  ti.tm_year - 100,
@@ -40,7 +40,7 @@ unsigned int logger::PrintLog(const char *prefix, const Level level, const char 
 #endif
     logger::appendPrefixToBuffer(buffer, getLogLevelName(level).data());
     size_t nLen = strlen(buffer);
-    snprintf(buffer + nLen, BUFFER_MAX - nLen - 1, " - %s: ", prefix);
+    snprintf(buffer + nLen, BUFFER_MAX - nLen - 1, "[%s] ", prefix);
     nLen = strlen(buffer);
     va_start(args, fmt);
     vsnprintf(buffer + nLen, BUFFER_MAX - nLen - 1, fmt, args);
@@ -58,8 +58,6 @@ unsigned int logger::PrintLog(const Level level, const char *fmt, ...)
 
     logger::appendPrefixToBuffer(buffer, getLogLevelName(level).data());
     size_t nLen = strlen(buffer);
-    snprintf(buffer + nLen, BUFFER_MAX - nLen - 1, ": ");
-    nLen = strlen(buffer);
     va_start(args, fmt);
     vsnprintf(buffer + nLen, BUFFER_MAX - nLen - 1, fmt, args);
     va_end(args);

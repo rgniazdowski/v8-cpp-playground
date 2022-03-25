@@ -38,7 +38,6 @@ namespace script::modules
         inline static void setTimeout(FunctionCallbackInfo const &args) { setTimerWrapper(1, args); }
 
         static void clearTimeout(unsigned int handle);
-
     protected:
         inline static ScriptManager *s_pScriptMgr = nullptr;
     }; //# class Timers

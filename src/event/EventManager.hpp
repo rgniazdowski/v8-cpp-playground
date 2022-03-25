@@ -50,7 +50,6 @@ namespace event
         {
             return static_cast<EventStruct *>(requestEventStruct(EventType));
         }
-        WrappedArgs *requestWrappedArgs(void);
         //#-------------------------------------------------------------------------------
 
         /**
@@ -59,6 +58,13 @@ namespace event
          * @param list
          */
         ThrownEvent &throwEvent(Type eventCode, WrappedArgs &args);
+
+        template <typename... Args>
+        ThrownEvent &throwEvent(Type eventCode, Args &&...args)
+        {
+            WrappedArgs wrapped = {util::WrappedValue::wrap(args)...};
+            return throwEvent(eventCode, wrapped);
+        }
 
         //#-------------------------------------------------------------------------------
 
@@ -142,7 +148,7 @@ namespace event
 
         inline bool hasTimers(void) const
         {
-            const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
+            const std::lock_guard<std::mutex> lock(m_mutexTimers);
             return !m_timerEntries.empty();
         }
         bool hasTimer(const uint32_t id) const;
@@ -201,6 +207,8 @@ namespace event
         ///
         uint32_t m_cleanupIntervalId;
         ///
+        std::vector<uint32_t> m_markedTimeouts;
+        ///
         EventsPtrVec m_eventStructs;
         ///
         EventsPtrVec m_eventStructsFreeSlots;
@@ -209,7 +217,7 @@ namespace event
         ///
         mutable std::mutex m_mutexEventBinds;
         ///
-        mutable std::recursive_mutex m_mutexTimers;
+        mutable std::mutex m_mutexTimers;
     }; //# class EventManager
 
     template <typename UserClass, typename ReturnType, typename... Args>
@@ -375,7 +383,7 @@ namespace event
     uint32_t EventManager::addTimeout(const int timeout, ReturnType (*function)(Args...),
                                       WrappedArgs &args, const std::initializer_list<std::string> &argNames)
     {
-        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
+        const std::lock_guard<std::mutex> lock(m_mutexTimers);
         m_timerEntries.emplace(std::move(TimerHelper::function<TimerEntryInfo::TIMEOUT, ReturnType, Args...>(timeout, function, argNames).setArgs(std::move(args))));
         return m_timerEntries.back().getId();
     }
@@ -387,7 +395,7 @@ namespace event
                                       WrappedArgs &args,
                                       const std::initializer_list<std::string> &argNames)
     {
-        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
+        const std::lock_guard<std::mutex> lock(m_mutexTimers);
         m_timerEntries.emplace(std::move(TimerHelper::method<TimerEntryInfo::TIMEOUT, UserClass, ReturnType, Args...>(timeout, pObject, methodMember, argNames).setArgs(std::move(args))));
         return m_timerEntries.back().getId();
     }
@@ -398,7 +406,7 @@ namespace event
                                        const int repeats, WrappedArgs &args,
                                        const std::initializer_list<std::string> &argNames)
     {
-        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
+        const std::lock_guard<std::mutex> lock(m_mutexTimers);
         m_timerEntries.emplace(std::move(TimerHelper::function<TimerEntryInfo::INTERVAL, ReturnType, Args...>(interval, function, repeats, argNames).setArgs(std::move(args))));
         return m_timerEntries.back().getId();
     }
@@ -410,7 +418,7 @@ namespace event
                                        const int repeats, WrappedArgs &args,
                                        const std::initializer_list<std::string> &argNames)
     {
-        const std::lock_guard<std::recursive_mutex> lock(m_mutexTimers);
+        const std::lock_guard<std::mutex> lock(m_mutexTimers);
         m_timerEntries.emplace(std::move(TimerHelper::method<TimerEntryInfo::INTERVAL, UserClass, ReturnType, Args...>(interval, pObject, methodMember, repeats, argNames).setArgs(std::move(args))));
         return m_timerEntries.back().getId();
     }

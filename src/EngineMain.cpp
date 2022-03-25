@@ -26,7 +26,7 @@ EngineMain::EngineMain(int argc, char **argv) : base_type(),
     base_type::initialize();
     srand((unsigned int)time(nullptr));
     this->setEventManager();
-    m_init = false;
+    m_init.store(false);
     // Setting up the main thread for processing events
     m_thread.setFunction([this]()
                          {
@@ -80,6 +80,7 @@ bool EngineMain::destroy(void)
     logger::debug("Destroying the main Engine object...");
     executeEvent(event::Type::ProgramQuit);
     this->update();
+    this->stopThread();
     bool status = true;
     if (!releaseResources())
         status = false;
@@ -109,10 +110,11 @@ bool EngineMain::initialize(void)
     m_scriptMgr = script::ScriptManager::instance(m_argv);
     base::ManagerRegistry::instance()->add(m_scriptMgr); // Add Script Manager to the registry
     m_scriptMgr->initialize();
-    m_init = true;
+    m_init.store(true);
     this->startThread();
     m_resourceMgr->startThread();
     m_scriptMgr->startThread();
+    executeEvent(event::Type::ProgramInit);
     return true;
 }
 //>---------------------------------------------------------------------------------------

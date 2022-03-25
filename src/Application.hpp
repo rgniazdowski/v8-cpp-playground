@@ -201,7 +201,7 @@ bool Application<TEngineType>::initialize(void)
             this->cleanup();
             exit(SIGSEGV);
         }
-    };
+    }; //# handler (SignalHandler)
     double t1 = timesys::ms();
     logger::debug("Init program main...");
     if (!m_engineMain)
@@ -266,18 +266,18 @@ void Application<TEngineType>::cleanup(void)
     if (!m_appInit.load())
         return;
     base::ManagerRegistry::instance()->signalAll();
-    auto &registry = base::ManagerRegistry::instance()->getRegistryDirect();
-    for (auto &it : registry)
-    {
-        // Stop every manager possible (just the loops/threads, not releasing any memory).
-        // This also includes internal event manager (in this case EngineMain object).
-        it.second.manager->stopThread();
-    }
     logger::debug("Closing program...");
     preQuitStep(); //* Custom pre-quit step
     if (m_engineMain)
     {
         m_engineMain->destroy();
+        auto &registry = base::ManagerRegistry::instance()->getRegistryDirect();
+        for (auto &it : registry)
+        {
+            // Stop every manager possible (just the loops/threads, not releasing any memory).
+            // This also includes internal event manager (in this case EngineMain object).
+            it.second.manager->stopThread();
+        }
         delete m_engineMain;
         m_engineMain = nullptr;
     }
