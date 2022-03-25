@@ -3,6 +3,7 @@
 #include <script/ScriptResource.hpp>
 #include <script/modules/Console.hpp>
 #include <script/modules/Timers.hpp>
+#include <script/modules/Events.hpp>
 #include <v8pp/convert.hpp>
 
 #include <event/EventManager.hpp>
@@ -84,11 +85,17 @@ bool script::ScriptManager::initialize(void)
             registerModule(console);
         }
         {
+            modules::Timers::s_pScriptMgr = this;
             // Timers wrapped - create callbacks and timers on EventManager
             auto timers = new modules::Timers(m_isolate);
-            timers->s_pScriptMgr = this;
             timers->initialize();
             registerModule(timers);
+        }
+        {
+            // Events - this is EventManager global along with additional info
+            auto events = new modules::Events(m_isolate);
+            events->initialize();
+            registerModule(events);
         }
         // Create a new context.
         // Main context is registered - now can create and manage all global objects before
@@ -128,8 +135,9 @@ bool script::ScriptManager::initialize(void)
         auto callback = ScriptCallback::create(&ScriptManager::scriptCallbackHandler, this);
         callback->m_script = static_cast<ScriptResource *>(mainScript)->getContent();
         (*callback)();
+        m_thread.runJustOnce();
     }
-    m_init = true;
+    m_init.store(true);
     return true;
 } //> initialize()
 //>#--------------------------------------------------------------------------------------
@@ -148,7 +156,7 @@ bool script::ScriptManager::destroy(void)
     v8::V8::ShutdownPlatform();
     delete m_createParams.array_buffer_allocator;
     m_isolate = nullptr;
-    m_init = false;
+    m_init.store(false);
     return true;
 } //> destroy()
 //>#--------------------------------------------------------------------------------------
@@ -230,6 +238,9 @@ bool script::ScriptManager::hasModule(const std::string &name) const
 void script::ScriptManager::releaseModules(void)
 {
     const std::lock_guard<std::mutex> lock(m_mutex);
+    v8::Locker locker(m_isolate);
+    v8::Isolate::Scope isolate_scope(m_isolate);
+    v8::HandleScope handle_scope(m_isolate);
     for (auto &it : m_modules)
     {
         delete it.second;
@@ -251,7 +262,7 @@ script::ScriptCallback *script::ScriptManager::createScriptCallback(const LocalF
 }
 //>#--------------------------------------------------------------------------------------
 
-script::ScriptCallback *script::ScriptManager::createScriptCallback(const LocalString& script) 
+script::ScriptCallback *script::ScriptManager::createScriptCallback(const LocalString &script)
 {
     return ScriptCallback::create(&ScriptManager::scriptCallbackHandler, m_isolate, script, this);
 }

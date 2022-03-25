@@ -84,6 +84,7 @@ set(FG_Event_Sources
 # Script source
 set(FG_Script_Headers
     script/modules/Console.hpp
+    script/modules/Events.hpp
     script/modules/Timers.hpp
     script/InternalModule.hpp
     script/Module.hpp
@@ -95,6 +96,7 @@ set(FG_Script_Headers
 )
 set(FG_Script_Sources
     script/modules/Console.cpp
+    script/modules/Events.cpp
     script/modules/Timers.cpp
     script/ScriptCustomModule.cpp
     script/ScriptV8Module.cpp
