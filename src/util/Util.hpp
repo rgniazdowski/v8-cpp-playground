@@ -97,7 +97,8 @@ namespace strings
                        const std::string &fill = " ",
                        const std::string &whitespace = " \t\r");
 
-    void replaceAll(std::string &source, const std::string &needle, const std::string &replacer);
+    void replaceAll(std::string &source, std::string_view needle, std::string_view replacer);
+    void replaceAll(std::string &source, const std::vector<std::string_view> &needlePairs);
 
     std::vector<std::string> &split(const std::string &input, char delim,
                                     std::vector<std::string> &elems);

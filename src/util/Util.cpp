@@ -203,21 +203,36 @@ std::string strings::reduce(const std::string &str, const std::string &fill, con
 }
 //>---------------------------------------------------------------------------------------
 
-void strings::replaceAll(std::string &source, const std::string &needle, const std::string &replacer)
+void strings::replaceAll(std::string &source, std::string_view needle, std::string_view replacer)
+{
+    replaceAll(source, {needle, replacer});
+}
+//>---------------------------------------------------------------------------------------
+
+void strings::replaceAll(std::string &source, const std::vector<std::string_view> &needlePairs)
 {
     std::string newString;
-    newString.reserve(source.length()); // avoids a few memory allocations
-    std::string::size_type lastPos = 0;
-    std::string::size_type findPos;
-    while (std::string::npos != (findPos = source.find(needle, lastPos)))
+    const auto lenPairs = needlePairs.size() % 2 == 0 ? needlePairs.size() : needlePairs.size() - 1;
+    if (!lenPairs)
+        return;
+    for (size_t i = 0; i < lenPairs; i += 2)
     {
-        newString.append(source, lastPos, findPos - lastPos);
-        newString += replacer;
-        lastPos = findPos + needle.length();
+        newString.reserve(source.length()); // avoids a few memory allocations
+        auto &needle = needlePairs.at(i);
+        auto &replacer = needlePairs.at(i + 1);
+        std::string::size_type lastPos = 0;
+        std::string::size_type findPos;
+        while (std::string::npos != (findPos = source.find(needle, lastPos)))
+        {
+            newString.append(source, lastPos, findPos - lastPos);
+            newString += replacer;
+            lastPos = findPos + needle.length();
+        }
+        // Care for the rest after last occurrence
+        newString.append(source, lastPos, source.length() - lastPos);
+        source.swap(newString);
+        newString.clear();
     }
-    // Care for the rest after last occurrence
-    newString.append(source, lastPos, source.length() - lastPos);
-    source.swap(newString);
 }
 //>---------------------------------------------------------------------------------------
 

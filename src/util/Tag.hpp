@@ -6,6 +6,8 @@
 #include <string>
 #include <unordered_map>
 
+#include <util/UniversalId.hpp>
+
 namespace util
 {
     struct TagBase
@@ -86,24 +88,14 @@ namespace util
             {
                 return s_setName.data();
             }
-            // fallback to typeid and name, also try to jump over any spaces
-            auto n = typeid(UserClass).name();
-            auto sv = std::string_view(n);
-            int s = 0;
-            for (int i = 0; i < sv.length(); i++)
-            {
-                char c = n[i];
-                if (c == ' ')
-                {
-                    s = i + 1;
-                    break;
-                }
-            }
-            n += s;
-            // Register string name for a given id - id is static and incremented automatically
+            if (Tag<void>::has(self_type::id()))
+                return Tag<void>::name(self_type::id()).data();
+            auto name = std::string_view(typeid(UserClass).name());
+            std::string transformed;
+            collapseTypeString(transformed, name);
             if (!Tag<void>::has(self_type::id()))
-                Tag<void>::set(self_type::id(), n);
-            return n;
+                Tag<void>::set(self_type::id(), transformed);
+            return Tag<void>::name(self_type::id()).data();
         }
         Tag() = delete;
         Tag(const self_type &in) = delete;

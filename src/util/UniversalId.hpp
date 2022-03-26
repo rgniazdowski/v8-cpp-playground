@@ -6,8 +6,35 @@
 #include <string>
 #include <unordered_map>
 
+#include <util/Util.hpp>
+
 namespace util
 {
+    inline void collapseTypeString(std::string &output, std::string_view input)
+    {
+        const std::initializer_list<std::string_view> all_prefixes{"util::UniversalId<", "UniversalId<"};
+        const std::initializer_list<std::string_view> any_suffixes{">::name"};
+        for (auto &&prefix : all_prefixes)
+        {
+            const auto p = input.find(prefix);
+            if (p != input.npos)
+                input.remove_prefix(p + prefix.size());
+        }
+        for (auto &&suffix : any_suffixes)
+        {
+            const auto p = input.rfind(suffix);
+            if (p != input.npos)
+            {
+                input.remove_suffix(input.size() - p);
+                break;
+            }
+        }
+        output.clear();
+        output.reserve(input.length() + 1);
+        output.append(input);
+        strings::replaceAll(output, {"class ", "", "struct ", "", " >", ">"});
+    }
+
     struct UniversalIdBase
     {
     protected:
@@ -86,24 +113,24 @@ namespace util
             {
                 return s_setName.data();
             }
-            // fallback to typeid and name, also try to jump over any spaces
-            auto n = typeid(UserClass).name();
-            auto sv = std::string_view(n);
-            int s = 0;
-            for (int i = 0; i < sv.length(); i++)
-            {
-                char c = n[i];
-                if (c == ' ')
-                {
-                    s = i + 1;
-                    break;
-                }
-            }
-            n += s;
+            if (UniversalId<void>::has(self_type::id()))
+                return UniversalId<void>::name(self_type::id()).data();
+            auto name = std::string_view(typeid(UserClass).name());
+            /*
+            #if defined(_MSC_VER) && !defined(__clang__)
+            std::string_view name = __FUNCSIG__;
+            #elif defined(__clang__) || defined(__GNUC__)
+            std::string_view name = __PRETTY_FUNCTION__;
+            #else
+            #error "Unknown compiler"
+            #endif
+            */
+            std::string transformed;
+            collapseTypeString(transformed, name);
             // Register string name for a given id - id is static and incremented automatically
             if (!UniversalId<void>::has(self_type::id()))
-                UniversalId<void>::set(self_type::id(), n);
-            return n;
+                UniversalId<void>::set(self_type::id(), transformed);
+            return UniversalId<void>::name(self_type::id()).data();
         }
         UniversalId() = delete;
         UniversalId(const self_type &in) = delete;
