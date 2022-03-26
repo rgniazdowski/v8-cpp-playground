@@ -36,19 +36,23 @@ script::LocalValue *script::argsToPointer(v8::Isolate *isolate, util::WrappedArg
         //
         //      ? How to unpack wrapped args and know the real type? Including casting?
         //
-        auto *converter = getWrappedValueConverter(wrapped.getPrimitiveTypeId()); // this will also call converter for EXTERNAL type
+        auto converter = getWrappedValueConverter(wrapped.getPrimitiveTypeId()); // this will also call converter for EXTERNAL type
         if (!converter)
         {
             argv[idx] = v8::Undefined(isolate);
             continue;
         }
+        // First check if the value is registered with V8
         auto registered = converter->isRegistered(isolate, wrapped);
         if (!registered && wrapped.isExternal())
         {
+            // If it's not, it will be registered in place but also added to the list in
+            // this case it's a temporary - will get unregistered afterwards based on that list.
             converter->registerWithV8(isolate, wrapped);
-            // add to the list for easy unregistration - wrapped value now works as a temporary
+            // Add to the list for easy unregistration - wrapped value now works as a temporary
             registeredArgs.push_back(pWrapped);
         }
+        // convert requires the value to exist beforehand (if it's external)
         auto value = converter->convert(isolate, wrapped);
         argv[idx] = value;
     } //# for each original argument

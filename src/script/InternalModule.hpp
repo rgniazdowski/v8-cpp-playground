@@ -8,6 +8,7 @@
 
 namespace script
 {
+    class ScriptManager;
     /**
      * Internal module is a special kind of module - without a source code, it is made of
      * custom C++ bindings mostly done via V8PP library. The idea here is to have a fast
@@ -23,7 +24,7 @@ namespace script
     class InternalModule : public Module
     {
     public:
-        InternalModule(v8::Isolate* isolate, std::string_view name) : Module(isolate, name)
+        InternalModule(v8::Isolate *isolate, std::string_view name) : Module(isolate, name)
         {
             setMode(BuiltinGlobalsOnly); // in most cases it will not be loadable
         }

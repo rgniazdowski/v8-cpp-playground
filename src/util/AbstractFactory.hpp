@@ -15,17 +15,19 @@ namespace util
         using self_type = FactoryObjectBase;
 
     public:
+        std::string name;
         std::string fileExtension;
         util::StringVector fileExtensions;
 
     public:
-        FactoryObjectBase() : fileExtension() {}
-        FactoryObjectBase(std::string_view fileExt) : fileExtension(fileExt), fileExtensions()
+        FactoryObjectBase() : name(), fileExtension(), fileExtensions() {}
+        FactoryObjectBase(std::string_view _name, std::string_view _fileExt) : name(_name), fileExtension(_fileExt), fileExtensions()
         {
             strings::split(fileExtension, ';', fileExtensions);
         }
         FactoryObjectBase(const self_type &orig)
         {
+            name = orig.name;
             fileExtension = orig.fileExtension;
             fileExtensions = orig.fileExtensions;
         }
@@ -46,7 +48,7 @@ namespace util
 
     public:
         FactoryObject() : base_type() {}
-        FactoryObject(std::string_view fileExt) : base_type(fileExt) {}
+        FactoryObject(std::string_view name, std::string_view fileExt) : base_type(name, fileExt) {}
         FactoryObject(const self_type &orig) {}
 
         virtual ~FactoryObject() {}
@@ -95,6 +97,8 @@ namespace util
             m_nameMap.clear();
         }
 
+        const NameMap &getNameMap(void) const { return m_nameMap; }
+
         template <typename TUserType>
         bool registerObjectType(const key_type &key, std::string_view keyName, std::string_view fileExtensions = "")
         {
@@ -105,7 +109,7 @@ namespace util
             auto it = m_factoryMap.find(key);
             if (it != m_factoryMap.end())
                 return false;
-            m_factoryMap[key] = new FactoryObject<data_type>(fileExtensions);
+            m_factoryMap[key] = new FactoryObject<data_type>(keyName, fileExtensions);
             m_nameMap[std::string(keyName)] = key;
             return true;
         }
@@ -131,7 +135,7 @@ namespace util
             return false;
         }
 
-        bool unregisterObjectType(std::string_view keyName)
+        bool unregisterObjectType(const std::string &keyName)
         {
             auto it = m_nameMap.find(keyName);
             if (it != m_nameMap.end())
@@ -154,9 +158,29 @@ namespace util
             return (key_type)0;
         }
 
+        key_type getKeyTypeForName(const std::string &name)
+        {
+            auto it = m_nameMap.find(name);
+            if (it != m_nameMap.end())
+            {
+                auto found = m_factoryMap.find(it->second);
+                if (found != m_factoryMap.end())
+                    return it->second;
+            }
+            return (key_type)0;
+        }
+
         bool isRegistered(const key_type &key) const { return m_factoryMap.find(key) != m_factoryMap.end(); }
 
-        bool isRegistered(std::string_view keyName) const
+        std::string_view getName(const key_type &key) const
+        {
+            auto found = m_factoryMap.find(key);
+            if (found == m_factoryMap.end())
+                return "";
+            return found->name;
+        }
+
+        bool isRegistered(const std::string &keyName) const
         {
             auto it = m_nameMap.find(keyName);
             if (it != m_nameMap.end())

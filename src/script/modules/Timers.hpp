@@ -7,11 +7,6 @@
 
 #include <v8pp/module.hpp>
 
-namespace script
-{
-    class ScriptManager;
-} //> namespace script
-
 namespace script::modules
 {
     class Timers : public ::script::InternalModule

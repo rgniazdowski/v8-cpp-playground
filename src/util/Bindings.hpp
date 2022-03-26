@@ -460,13 +460,13 @@ namespace util
         }
 
         template <typename InputType, bool is_pointer = std::is_pointer_v<InputType>>
-        static typename std::enable_if<is_pointer == true, WrappedValue *>::type wrap(InputType value)
+        static typename std::enable_if<is_pointer == true, WrappedValue *>::type wrap(InputType value, uint32_t tid = 0)
         {
-            return external<std::remove_pointer_t<InputType>>(value, 0);
+            return external<std::remove_pointer_t<InputType>>(value, 0, tid);
         }
 
         template <>
-        static WrappedValue *wrap<const char *, true>(const char *value)
+        static WrappedValue *wrap<const char *, true>(const char *value, uint32_t tid)
         {
             return new WrappedValue(std::string(value), typeid(value).name());
         }
@@ -478,7 +478,7 @@ namespace util
         }
 
         template <>
-        static WrappedValue *wrap<WrappedValue *, true>(WrappedValue *value)
+        static WrappedValue *wrap<WrappedValue *, true>(WrappedValue *value, uint32_t tid)
         {
             return new WrappedValue(*value);
         }
@@ -493,13 +493,13 @@ namespace util
         }
 
         template <typename InputType, bool is_pointer = std::is_pointer_v<InputType>>
-        static typename std::enable_if<is_pointer == true, WrappedValue>::type wrapInPlace(InputType value)
+        static typename std::enable_if<is_pointer == true, WrappedValue>::type wrapInPlace(InputType value, uint32_t tid = 0)
         {
-            return externalInPlace<std::remove_pointer_t<InputType>>(value, 0);
+            return externalInPlace<std::remove_pointer_t<InputType>>(value, 0, tid);
         }
 
         template <>
-        static WrappedValue wrapInPlace<const char *, true>(const char *value)
+        static WrappedValue wrapInPlace<const char *, true>(const char *value, uint32_t tid)
         {
             return WrappedValue(std::string(value), typeid(value).name());
         }
@@ -512,23 +512,23 @@ namespace util
         //>-------------------------------------------------------------------------------
 
         template <typename InputType>
-        static WrappedValue *external(const InputType *value, uint64_t id)
+        static WrappedValue *external(const InputType *value, uint64_t id, uint32_t tid = 0)
         {
             using data_type = std::decay_t<InputType>;
             return new WrappedValue(typeid(data_type).name(),
                                     !value ? nullptr : (void *)value,
                                     !value ? id : value->getIdentifier(),
-                                    UniversalId<data_type>::id());
+                                    tid ? tid : UniversalId<data_type>::id());
         }
 
         template <typename InputType>
-        static WrappedValue externalInPlace(const InputType *value, uint64_t id)
+        static WrappedValue externalInPlace(const InputType *value, uint64_t id, uint32_t tid = 0)
         {
             using data_type = std::decay_t<InputType>;
             return WrappedValue(typeid(data_type).name(),
                                 !value ? nullptr : (void *)value,
                                 !value ? id : value->getIdentifier(),
-                                UniversalId<data_type>::id());
+                                tid ? tid : UniversalId<data_type>::id());
         }
         //>-------------------------------------------------------------------------------
 

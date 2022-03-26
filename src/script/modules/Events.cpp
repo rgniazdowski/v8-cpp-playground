@@ -28,51 +28,24 @@ script::modules::Events::Events(v8::Isolate *isolate)
 }
 //>---------------------------------------------------------------------------------------
 
-template <typename... TypeArgs>
-void remove_objects(v8::Isolate *isolate)
-{
-    auto list = {&v8pp::detail::classes::find<v8pp::raw_ptr_traits>(isolate, v8pp::detail::type_id<TypeArgs>())...};
-    for (auto &it : list)
-        it->remove_objects();
-}
-
 script::modules::Events::~Events()
 {
     auto isolate = m_class_callback.isolate();
-    remove_objects<util::Callback>(isolate);
-    remove_objects<event::EventTouch, event::EventMouse, event::EventSwipe,
-                   event::EventSwipePinch, event::EventSwipeRotate,
-                   event::EventKey, event::EventResource,
-                   event::EventVertexStream,
-                   event::EventCamera, event::EventSound,
-                   event::EventMenuChanged, event::EventWidget, event::EventGuiAction,
-                   event::EventSensors,
-                   event::EventSplashScreen,
-                   event::EventLoading, event::EventProgram,
-                   event::EventControllerDevice,
-                   event::EventControllerButton,
-                   event::EventControllerAxis>(isolate);
+    removeClassObjects<util::Callback>(isolate);
+    removeClassObjects<event::EventTouch, event::EventMouse, event::EventSwipe,
+                       event::EventSwipePinch, event::EventSwipeRotate,
+                       event::EventKey, event::EventResource,
+                       event::EventVertexStream,
+                       event::EventCamera, event::EventSound,
+                       event::EventMenuChanged, event::EventWidget, event::EventGuiAction,
+                       event::EventSensors,
+                       event::EventSplashScreen,
+                       event::EventLoading, event::EventProgram,
+                       event::EventControllerDevice,
+                       event::EventControllerButton,
+                       event::EventControllerAxis>(isolate);
 }
 //>---------------------------------------------------------------------------------------
-
-template <typename TClassType>
-void set_class_name(v8::Isolate *isolate, v8pp::class_<TClassType> &class_object, std::string_view name)
-{
-    class_object.class_function_template()->SetClassName(v8pp::to_v8(isolate, name));
-}
-
-template <typename TUserType>
-bool register_external_converter(void)
-{
-    script::registerWrappedValueConverter<TUserType>();
-    return true; // fake value
-}
-
-template <typename... TypeArgs>
-void register_external_converters(void)
-{
-    auto list = {register_external_converter<TypeArgs>()...};
-}
 
 bool script::modules::Events::initialize(void)
 {
@@ -101,28 +74,28 @@ bool script::modules::Events::initialize(void)
     m_module.function("addCallback", &Events::addCallback);
     m_module.function("deleteCallback", &Events::deleteCallback);
 
-    set_class_name(isolate, m_class_callback, "Callback");
-    set_class_name(isolate, m_class_base, "EventBase");
-    set_class_name(isolate, m_class_touch, "EventTouch");
-    set_class_name(isolate, m_class_mouse, "EventMouse");
-    set_class_name(isolate, m_class_swipe, "EventSwipe");
-    set_class_name(isolate, m_class_swipePinch, "EventSwipePinch");
-    set_class_name(isolate, m_class_swipeRotate, "EventSwipeRotate");
-    set_class_name(isolate, m_class_key, "EventKey");
-    set_class_name(isolate, m_class_resource, "EventResource");
-    set_class_name(isolate, m_class_vertexStream, "EventVertexStream");
-    set_class_name(isolate, m_class_camera, "EventCamera");
-    set_class_name(isolate, m_class_sound, "EventSound");
-    set_class_name(isolate, m_class_menuChanged, "EventMenuChanged");
-    set_class_name(isolate, m_class_widget, "EventWidget");
-    set_class_name(isolate, m_class_guiAction, "EventGuiAction");
-    set_class_name(isolate, m_class_sensors, "EventSensors");
-    set_class_name(isolate, m_class_splash, "EventSplashScreen");
-    set_class_name(isolate, m_class_loading, "EventLoading");
-    set_class_name(isolate, m_class_program, "EventProgram");
-    set_class_name(isolate, m_class_controller, "EventControllerDevice");
-    set_class_name(isolate, m_class_controllerButton, "EventControllerButton");
-    set_class_name(isolate, m_class_controllerAxis, "EventControllerAxis");
+    setClassName(isolate, m_class_callback, "Callback");
+    setClassName(isolate, m_class_base, "EventBase");
+    setClassName(isolate, m_class_touch, "EventTouch");
+    setClassName(isolate, m_class_mouse, "EventMouse");
+    setClassName(isolate, m_class_swipe, "EventSwipe");
+    setClassName(isolate, m_class_swipePinch, "EventSwipePinch");
+    setClassName(isolate, m_class_swipeRotate, "EventSwipeRotate");
+    setClassName(isolate, m_class_key, "EventKey");
+    setClassName(isolate, m_class_resource, "EventResource");
+    setClassName(isolate, m_class_vertexStream, "EventVertexStream");
+    setClassName(isolate, m_class_camera, "EventCamera");
+    setClassName(isolate, m_class_sound, "EventSound");
+    setClassName(isolate, m_class_menuChanged, "EventMenuChanged");
+    setClassName(isolate, m_class_widget, "EventWidget");
+    setClassName(isolate, m_class_guiAction, "EventGuiAction");
+    setClassName(isolate, m_class_sensors, "EventSensors");
+    setClassName(isolate, m_class_splash, "EventSplashScreen");
+    setClassName(isolate, m_class_loading, "EventLoading");
+    setClassName(isolate, m_class_program, "EventProgram");
+    setClassName(isolate, m_class_controller, "EventControllerDevice");
+    setClassName(isolate, m_class_controllerButton, "EventControllerButton");
+    setClassName(isolate, m_class_controllerAxis, "EventControllerAxis");
 
     m_class_base.var("eventType", &event::EventBase::eventType)
         .var("timeStamp", &event::EventBase::timeStamp)
@@ -231,18 +204,18 @@ bool script::modules::Events::initialize(void)
 
     m_class_controllerAxis.inherit<event::EventBase>();
 
-    register_external_converters<event::EventTouch, event::EventMouse, event::EventSwipe,
-                                 event::EventSwipePinch, event::EventSwipeRotate,
-                                 event::EventKey, event::EventResource,
-                                 event::EventVertexStream,
-                                 event::EventCamera, event::EventSound,
-                                 event::EventMenuChanged, event::EventWidget, event::EventGuiAction,
-                                 event::EventSensors,
-                                 event::EventSplashScreen,
-                                 event::EventLoading, event::EventProgram,
-                                 event::EventControllerDevice,
-                                 event::EventControllerButton,
-                                 event::EventControllerAxis>();
+    registerExternalConverters<event::EventTouch, event::EventMouse, event::EventSwipe,
+                               event::EventSwipePinch, event::EventSwipeRotate,
+                               event::EventKey, event::EventResource,
+                               event::EventVertexStream,
+                               event::EventCamera, event::EventSound,
+                               event::EventMenuChanged, event::EventWidget, event::EventGuiAction,
+                               event::EventSensors,
+                               event::EventSplashScreen,
+                               event::EventLoading, event::EventProgram,
+                               event::EventControllerDevice,
+                               event::EventControllerButton,
+                               event::EventControllerAxis>();
 
     m_init = true;
     return true;

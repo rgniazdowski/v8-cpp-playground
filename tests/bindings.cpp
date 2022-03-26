@@ -68,7 +68,7 @@ TEST_CASE("Create simple bindings", "[bindings]")
 TEST_CASE("Invoke function bindings manually", "[bindings]")
 {
     auto pBinding = new util::BindInfoFunction("TestGlobalFunction", &TestGlobalFunction, {"intValue", "stringValue"});
-    util::WrappedValue::Args args = {util::WrappedValue::wrap(123), util::WrappedValue::wrap("Hello World!")};
+    util::WrappedArgs args = {util::WrappedValue::wrap(123), util::WrappedValue::wrap("Hello World!")};
     int expectedResult = 123 + 10 + (int)strlen("Hello World!");
     CHECK(util::BindingHelper::call<void, int, int, const std::string &>(nullptr, pBinding, 123, "Hello World!") == expectedResult);
     CHECK(pBinding->call(123, "Hello World!") == expectedResult);

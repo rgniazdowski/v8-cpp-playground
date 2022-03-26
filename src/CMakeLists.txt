@@ -63,6 +63,7 @@ set(FG_Resource_Headers
     resource/ResourceConfig.hpp
     resource/ResourceConfigJson.hpp
     resource/ResourceManager.hpp
+    resource/ZipFileResource.hpp
 )
 set(FG_Resource_Sources
     resource/ResourceManager.cpp
@@ -85,6 +86,7 @@ set(FG_Event_Sources
 set(FG_Script_Headers
     script/modules/Console.hpp
     script/modules/Events.hpp
+    script/modules/Resources.hpp
     script/modules/Timers.hpp
     script/InternalModule.hpp
     script/Module.hpp
@@ -97,6 +99,7 @@ set(FG_Script_Headers
 set(FG_Script_Sources
     script/modules/Console.cpp
     script/modules/Events.cpp
+    script/modules/Resources.cpp
     script/modules/Timers.cpp
     script/ScriptCustomModule.cpp
     script/ScriptV8Module.cpp

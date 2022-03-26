@@ -70,7 +70,7 @@ namespace script
     {
         virtual LocalValue convert(v8::Isolate *isolate, const util::WrappedValue &wrapped) = 0;
         virtual bool isRegistered(v8::Isolate *isolate, const util::WrappedValue &wrapped) const { return false; }
-        virtual bool registerWithV8(v8::Isolate *isolate, const util::WrappedValue &wrapped) const { return false; }
+        virtual LocalObject registerWithV8(v8::Isolate *isolate, const util::WrappedValue &wrapped) const { return LocalObject(); }
         virtual bool unregister(v8::Isolate *isolate, const util::WrappedValue &wrapped) const { return false; }
     };
 
@@ -137,21 +137,20 @@ namespace script
                 return false;
             return true;
         }
-        bool registerWithV8(v8::Isolate *isolate, const util::WrappedValue &wrapped) const override
+        LocalObject registerWithV8(v8::Isolate *isolate, const util::WrappedValue &wrapped) const override
         {
             if (!isolate || wrapped.isEmpty() || !wrapped.isExternal())
-                return false;
+                return LocalObject();
             using user_type = std::decay_t<UserType>;
             using v8_class = v8pp::class_<user_type>;
             // this will call cast and convertToPointer which uses global object registry
             auto vptr = static_cast<const user_type *>(wrapped);
             if (!vptr)
-                return false;
+                return LocalObject();
             LocalObject obj = v8_class::find_object(isolate, vptr);
             if (!obj.IsEmpty())
-                return false; // already registered
-            v8_class::reference_external(isolate, const_cast<user_type *>(vptr));
-            return true;
+                return obj; // already registered
+            return v8_class::reference_external(isolate, const_cast<user_type *>(vptr));
         }
         bool unregister(v8::Isolate *isolate, const util::WrappedValue &wrapped) const override
         {
@@ -210,6 +209,32 @@ namespace script
 
     void unregisterWrappedValueConverters(void);
 
+    template <typename TClassType>
+    void setClassName(v8::Isolate *isolate, v8pp::class_<TClassType> &class_object, std::string_view name)
+    {
+        class_object.class_function_template()->SetClassName(v8pp::to_v8(isolate, name));
+    }
+
+    template <typename TUserType>
+    bool registerExternalConverter(void)
+    {
+        script::registerWrappedValueConverter<TUserType>();
+        return true; // fake value
+    }
+
+    template <typename... TypeArgs>
+    void registerExternalConverters(void)
+    {
+        auto list = {registerExternalConverter<TypeArgs>()...};
+    }
+
+    template <typename... TypeArgs>
+    void removeClassObjects(v8::Isolate *isolate)
+    {
+        auto list = {&v8pp::detail::classes::find<v8pp::raw_ptr_traits>(isolate, v8pp::detail::type_id<TypeArgs>())...};
+        for (auto &it : list)
+            it->remove_objects();
+    }
 } //> namespace script
 
 #endif //> FG_INC_SCRIPT_V8

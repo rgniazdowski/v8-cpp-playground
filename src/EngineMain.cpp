@@ -16,6 +16,8 @@
 /// Event management
 #include <event/EventManager.hpp>
 #include <Unistd.hpp>
+/// Other resource types
+#include <resource/ZipFileResource.hpp>
 
 EngineMain::EngineMain(int argc, char **argv) : base_type(),
                                                 m_argc(argc),
@@ -106,6 +108,9 @@ bool EngineMain::initialize(void)
     base::ManagerRegistry::instance()->add(m_resourceMgr);
     m_resourceMgr->setMaximumMemory(128 * 1024 * 1024 - 1024 * 1024 * 10); // #FIXME #TODO
     m_resourceMgr->initialize();
+    auto factory = m_resourceMgr->getResourceFactory();
+    factory->registerObjectType<resource::ZipFileResource>(util::UniversalId<resource::ZipFileResource>::id(),
+                                                           util::UniversalId<resource::ZipFileResource>::name("ZipFile"), "zip");
     setEventManager(); // FIXME
     m_scriptMgr = script::ScriptManager::instance(m_argv);
     base::ManagerRegistry::instance()->add(m_scriptMgr); // Add Script Manager to the registry

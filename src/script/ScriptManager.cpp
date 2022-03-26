@@ -4,6 +4,7 @@
 #include <script/modules/Console.hpp>
 #include <script/modules/Timers.hpp>
 #include <script/modules/Events.hpp>
+#include <script/modules/Resources.hpp>
 #include <v8pp/convert.hpp>
 
 #include <event/EventManager.hpp>
@@ -80,22 +81,28 @@ bool script::ScriptManager::initialize(void)
         v8::HandleScope handle_scope(m_isolate);
         {
             // Need to create and initialize list of globals and built-in modules.
-            auto console = new modules::Console(m_isolate);
-            console->initialize();
-            registerModule(console);
+            auto module = new modules::Console(m_isolate);
+            module->initialize();
+            registerModule(module);
         }
         {
             modules::Timers::s_pScriptMgr = this;
             // Timers wrapped - create callbacks and timers on EventManager
-            auto timers = new modules::Timers(m_isolate);
-            timers->initialize();
-            registerModule(timers);
+            auto module = new modules::Timers(m_isolate);
+            module->initialize();
+            registerModule(module);
         }
         {
             // Events - this is EventManager global along with additional info
-            auto events = new modules::Events(m_isolate);
-            events->initialize();
-            registerModule(events);
+            auto module = new modules::Events(m_isolate);
+            module->initialize();
+            registerModule(module);
+        }
+        {
+            // Resources - this is ResourceManager global along with additional info
+            auto module = new modules::Resources(m_isolate);
+            module->initialize();
+            registerModule(module);
         }
         // Create a new context.
         // Main context is registered - now can create and manage all global objects before
