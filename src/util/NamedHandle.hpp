@@ -261,7 +261,7 @@ namespace util
         uint32_t calculateHash(void)
         {
             static std::hash<base_type> hasher;
-            m_hash = hasher(*this);
+            m_hash = (uint32_t)hasher(*this);
             return m_hash;
         }
 

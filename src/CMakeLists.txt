@@ -17,6 +17,7 @@ set(FG_Util_Headers
     util/AbstractFactory.hpp
     util/Bindings.hpp
     util/BindingsJson.hpp
+    util/BitField.hpp
     util/CallbackHelper.hpp
     util/Callbacks.hpp
     util/Dirent.hpp

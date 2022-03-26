@@ -3,6 +3,7 @@
 #define FG_INC_HANDLE
 
 #include <util/Tag.hpp>
+#include <util/BitField.hpp>
 
 namespace resource
 {
@@ -36,20 +37,18 @@ namespace util
 
         union
         {
-            struct
-            {
-                uint32_t m_index : MAX_BITS_INDEX;
-                uint8_t m_tag : MAX_BITS_TAG;
-                union
-                {
-                    uint32_t m_hash : MAX_BITS_HASH;
-                    uint32_t m_magic : MAX_BITS_MAGIC; /* read only */
-                };
-            };
+            uint8_t arr[8];
             uint64_t m_handle; /* read only */
+            BitFieldMember<0, MAX_BITS_INDEX> m_index;
+            BitFieldMember<MAX_BITS_INDEX, MAX_BITS_TAG> m_tag;
+            BitFieldMember<32, MAX_BITS_HASH> m_hash;
+            BitFieldMember<32, MAX_BITS_MAGIC> m_magic;
         };
+
         HandleBase() : m_handle(0) {}
+
         HandleBase(uint64_t handle) : m_handle(handle) {}
+
         HandleBase(uint32_t index, uint8_t tag, uint32_t hash) : m_index(index), m_tag(tag), m_hash(hash) {}
 
     public:

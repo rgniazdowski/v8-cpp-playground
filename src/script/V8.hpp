@@ -10,6 +10,36 @@
 #include <v8pp/convert.hpp>
 #include <resource/GlobalObjectRegistry.hpp>
 
+namespace v8pp
+{
+    template <>
+    struct convert<uint64_t>
+    {
+        using from_type = uint64_t;
+        using to_type = v8::Local<v8::BigInt>;
+
+        static bool is_valid(v8::Isolate *, v8::Local<v8::Value> value)
+        {
+            return !value.IsEmpty() && value->IsBigInt();
+        }
+
+        static from_type from_v8(v8::Isolate *isolate, v8::Local<v8::Value> value)
+        {
+            if (!is_valid(isolate, value))
+            {
+                throw invalid_argument(isolate, value, "BigInt");
+            }
+            // value->ToBigInt(isolate->GetCurrentContext()).FromMaybe(to_type())->Uint64Value();
+            return value.As<v8::BigInt>()->Uint64Value();
+        }
+
+        static to_type to_v8(v8::Isolate *isolate, from_type value)
+        {
+            return v8::BigInt::NewFromUnsigned(isolate, value);
+        }
+    };
+} //> namespace v8pp
+
 namespace script
 {
     using Utf8String = v8::String::Utf8Value;

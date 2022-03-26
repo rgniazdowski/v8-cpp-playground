@@ -152,7 +152,7 @@ void script::modules::Resources::getResource(FunctionCallbackInfo const &args)
         args.GetReturnValue().SetNull();
         return;
     }
-    if (!args[0]->IsString() && !args[0]->IsNumber())
+    if (!args[0]->IsString() && !args[0]->IsNumber() && !args[0]->IsBigInt())
     {
         args.GetReturnValue().SetNull();
         return;
