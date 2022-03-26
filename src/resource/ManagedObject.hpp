@@ -13,7 +13,8 @@ namespace resource
     {
     public:
         using self_type = ManagedObjectBase;
-        using callback_type = std::function<bool(void *, void *)>;
+        using callback_type = std::function<void(const ManagedObjectBase *, void *)>;
+        using function_type = void (*)(const ManagedObjectBase *, void *);
 
     public:
         ManagedObjectBase() : m_nameTag(), m_isManaged(false), m_onDestructorCallbacks() {}
@@ -28,21 +29,31 @@ namespace resource
         {
             for (auto &info : m_onDestructorCallbacks)
             {
-                if (info.callback)
-                {
-                    info.callback((void *)this, (void *)info.userData);
-                    info.callback.swap(callback_type());
-                    info.userData = NULL;
-                }
+                if (!info.callback)
+                    continue;
+                info.callback(this, info.userData);
+                info.callback.swap(callback_type());
+                info.userData = nullptr;
             }
             m_onDestructorCallbacks.clear();
         }
 
     public:
-        bool registerOnDestruct(callback_type &callback, void *pUserData = NULL)
+        bool registerOnDestruct(const callback_type &callback, void *pUserData = nullptr)
         {
             if (!callback)
                 return false;
+            auto *fnPointerA = callback.template target<function_type>();
+            size_t cmpaddrA = (size_t)(fnPointerA != nullptr ? *fnPointerA : 0);
+            for (auto const &info : m_onDestructorCallbacks)
+            {
+                if (!info.callback)
+                    continue;
+                auto *fnPointerB = info.callback.template target<function_type>();
+                size_t cmpaddrB = (size_t)(fnPointerB != nullptr ? *fnPointerB : 0);
+                if (cmpaddrA == cmpaddrB && (cmpaddrA != 0 || cmpaddrB != 0))
+                    return false; // already pushed
+            }
             CallbackData callbackInfo(callback, pUserData);
             m_onDestructorCallbacks.push_back(callbackInfo);
             return true;
@@ -50,11 +61,10 @@ namespace resource
 
         inline util::NamedHandle const &getName(void) const { return m_nameTag; }
 
+    protected:
         inline void setManaged(bool toggle = true) { m_isManaged = toggle; }
 
-    protected:
         util::NamedHandle m_nameTag;
-
         inline util::NamedHandle &getName(void) { return m_nameTag; }
 
     private:

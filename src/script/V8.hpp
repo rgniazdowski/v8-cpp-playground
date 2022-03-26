@@ -104,7 +104,7 @@ namespace script
         virtual bool unregister(v8::Isolate *isolate, const util::WrappedValue &wrapped) const { return false; }
     };
 
-    template <typename V8Type, util::WrappedValue::Type ValueType, typename UserType = void>
+    template <typename V8Type, util::WrappedValue::Type ValueType, typename TUserType = void>
     struct WrappedValueConverterSpec : public WrappedValueConverter
     {
         static_assert(std::is_base_of_v<v8::Primitive, V8Type>,
@@ -134,16 +134,16 @@ namespace script
         }
     };
 
-    template <typename UserType>
-    struct WrappedValueConverterSpec<v8::Object, util::WrappedValue::EXTERNAL, UserType> : public WrappedValueConverter
+    template <typename TUserType>
+    struct WrappedValueConverterSpec<v8::Object, util::WrappedValue::EXTERNAL, TUserType> : public WrappedValueConverter
     {
-        static_assert(std::is_void_v<UserType> == false,
+        static_assert(std::is_void_v<TUserType> == false,
                       "UserType cannot be void when specializing WrappedValueConverter with EXTERNAL value type");
         LocalValue convert(v8::Isolate *isolate, const util::WrappedValue &wrapped) override
         {
             if (!isolate || wrapped.isEmpty() || !wrapped.isExternal())
                 return v8::Undefined(isolate);
-            using user_type = std::decay_t<UserType>;
+            using user_type = std::decay_t<TUserType>;
             using v8_class = v8pp::class_<user_type>;
             // this will call cast and convertToPointer which uses global object registry
             auto vptr = static_cast<const user_type *>(wrapped);
@@ -156,7 +156,7 @@ namespace script
         {
             if (!isolate || wrapped.isEmpty() || !wrapped.isExternal())
                 return false;
-            using user_type = std::decay_t<UserType>;
+            using user_type = std::decay_t<TUserType>;
             using v8_class = v8pp::class_<user_type>;
             // this will call cast and convertToPointer which uses global object registry
             auto vptr = static_cast<const user_type *>(wrapped);
@@ -171,7 +171,7 @@ namespace script
         {
             if (!isolate || wrapped.isEmpty() || !wrapped.isExternal())
                 return LocalObject();
-            using user_type = std::decay_t<UserType>;
+            using user_type = std::decay_t<TUserType>;
             using v8_class = v8pp::class_<user_type>;
             // this will call cast and convertToPointer which uses global object registry
             auto vptr = static_cast<const user_type *>(wrapped);
@@ -186,7 +186,7 @@ namespace script
         {
             if (!isolate || wrapped.isEmpty() || !wrapped.isExternal())
                 return false;
-            using user_type = std::decay_t<UserType>;
+            using user_type = std::decay_t<TUserType>;
             using v8_class = v8pp::class_<user_type>;
             // this will call cast and convertToPointer which uses global object registry
             auto vptr = const_cast<user_type *>(static_cast<const user_type *>(wrapped));
@@ -200,8 +200,8 @@ namespace script
         }
     };
 
-    template <typename UserType>
-    using WrappedValueConverterSpecExternal = WrappedValueConverterSpec<v8::Object, util::WrappedValue::EXTERNAL, UserType>;
+    template <typename TUserType>
+    using WrappedValueConverterSpecExternal = WrappedValueConverterSpec<v8::Object, util::WrappedValue::EXTERNAL, TUserType>;
 
     WrappedValueConverter *getWrappedValueConverter(uint32_t tid);
 
@@ -210,10 +210,10 @@ namespace script
         return getWrappedValueConverter(util::WrappedValue::getPrimitiveTypeId(valueType));
     }
 
-    template <typename UserType>
-    std::enable_if_t<std::is_void_v<UserType> == false, WrappedValueConverter> *getWrappedValueConverter(void)
+    template <typename TUserType>
+    std::enable_if_t<std::is_void_v<TUserType> == false, WrappedValueConverter> *getWrappedValueConverter(void)
     {
-        using user_type = std::decay_t<UserType>;
+        using user_type = std::decay_t<TUserType>;
         auto tid = util::UniversalId<user_type>::id(); // FIXME
         return getWrappedValueConverter(tid);
     }
@@ -228,11 +228,11 @@ namespace script
         registerWrappedValueConverter(tid, converter);
     }
 
-    template <typename UserType>
-    inline std::enable_if_t<std::is_void_v<UserType> == false> registerWrappedValueConverter(void)
+    template <typename TUserType>
+    inline std::enable_if_t<std::is_void_v<TUserType> == false> registerWrappedValueConverter(void)
     {
-        using user_type = std::decay_t<UserType>;
-        WrappedValueConverterSpec<v8::Object, util::WrappedValue::EXTERNAL, UserType> *converter = new script::WrappedValueConverterSpecExternal<user_type>();
+        using user_type = std::decay_t<TUserType>;
+        WrappedValueConverterSpec<v8::Object, util::WrappedValue::EXTERNAL, TUserType> *converter = new script::WrappedValueConverterSpecExternal<user_type>();
         auto tid = util::UniversalId<user_type>::id(); // FIXME
         registerWrappedValueConverter(tid, converter);
     }
@@ -264,6 +264,28 @@ namespace script
         auto list = {&v8pp::detail::classes::find<v8pp::raw_ptr_traits>(isolate, v8pp::detail::type_id<TypeArgs>())...};
         for (auto &it : list)
             it->remove_objects();
+    }
+
+    template <typename TUserType>
+    bool tryToRemoveClassObject(v8::Isolate *isolate, const TUserType *pObject, v8pp::detail::type_info const &type)
+    {
+        if (!isolate || !pObject)
+            return false;
+        using user_type = std::decay_t<TUserType>;
+        using v8_class = v8pp::class_<user_type>;
+        // auto v8Class = v8pp::detail::classes::find<v8pp::raw_ptr_traits>(isolate, type);
+        auto vptr = static_cast<const user_type *>(pObject);
+        LocalObject obj = v8_class::find_object(isolate, vptr);
+        if (obj.IsEmpty())
+            return false;
+        v8_class::unreference_external(isolate, const_cast<user_type *>(vptr));
+        return true;
+    }
+
+    template <typename... TypeArgs>
+    void tryToRemoveClassObjects(v8::Isolate *isolate, const void *pObject)
+    {
+        auto list = {tryToRemoveClassObject<TypeArgs>(isolate, static_cast<const TypeArgs *>(pObject), v8pp::detail::type_id<TypeArgs>())...};
     }
 } //> namespace script
 

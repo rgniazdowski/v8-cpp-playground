@@ -27,7 +27,8 @@ namespace resource
         ResourceFactory() : base_type() {}
         virtual ~ResourceFactory() { destroy(); }
 
-    }; //> class ResourceFactory
+    }; //# class ResourceFactory
+    //#-----------------------------------------------------------------------------------
 
     using ResourceManagerTag = ::util::Tag<ResourceManager>;
 

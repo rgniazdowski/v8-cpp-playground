@@ -218,7 +218,7 @@ bool util::HandleManager<THandleType>::releaseHandle(const handle_type &rHandle)
     // auto tag = rHandle.getTag();
     //  ok remove it - tag as unused and add to free list
     auto &holder = m_managedData[index];
-    logger::debug("Releasing handle: index[%d], magic[%llu], handle[%d], name[%s]",
+    logger::debug("Releasing handle: index[%u], magic[%lu], handle[%llu], name[%s]",
                   index, rHandle.getMagic(), rHandle.getHandle(),
                   m_managedData[index].nameTag.c_str());
     if (!holder.nameTag.empty())
@@ -344,10 +344,8 @@ bool util::HandleManager<THandleType>::isHandleValid(const handle_type &handle)
     if ((index >= m_managedData.size()) || (m_managedData[index].magic != handle.getMagic()))
     {
         // no good! invalid handle == client programming error
-        logger::error("Invalid handle, magic numbers don't match: index[%d], magic[%d], handle[%llu], true_magic[%d], hash[%lu]",
-                      index,
-                      handle.getMagic(),
-                      handle.getHandle(),
+        logger::error("Invalid handle, magic numbers don't match: index[%u], magic[%lu], handle[%llu], true_magic[%lu], hash[%lu]",
+                      index, handle.getMagic(), handle.getHandle(),
                       m_managedData[index].magic,
                       m_managedData[index].nameTag.getHash());
         return false;

@@ -37,6 +37,8 @@ namespace script::modules
         bool instantiateGlobals(LocalContext &context) override;
         bool registerModule(LocalObject &exports) override;
 
+        static void onResourceDeleted(const resource::ManagedObjectBase *pObject, void *pUserData);
+
         static void requestResource(FunctionCallbackInfo const &args);
         static void getResource(FunctionCallbackInfo const &args);
         static void disposeResource(FunctionCallbackInfo const &args);

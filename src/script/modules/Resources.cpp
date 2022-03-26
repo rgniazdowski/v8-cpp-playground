@@ -74,6 +74,18 @@ bool script::modules::Resources::registerModule(LocalObject &exports)
 } //> registerModule(...)
 //>---------------------------------------------------------------------------------------
 
+void script::modules::Resources::onResourceDeleted(const resource::ManagedObjectBase *pObject, void *pUserData)
+{
+    if (!pUserData)
+        return;
+    auto isolate = static_cast<v8::Isolate *>(pUserData);
+    v8::Locker locker(isolate);
+    v8::Isolate::Scope isolate_scope(isolate);
+    v8::HandleScope handle_scope(isolate);
+    tryToRemoveClassObjects<resource::ZipFileResource>(isolate, static_cast<const void *>(pObject));
+} //> onResourceDeleted(...)
+//>---------------------------------------------------------------------------------------
+
 bool getNameOrIdentifier(v8::Isolate *isolate, script::LocalValue arg, std::string &outName, uint64_t &outIdentifier)
 {
     if (arg->IsString())
@@ -132,6 +144,7 @@ void script::modules::Resources::requestResource(FunctionCallbackInfo const &arg
     auto resource = resourceMgr->request(info, forcedType);
     if (resource)
     {
+        resource->registerOnDestruct(&script::modules::Resources::onResourceDeleted, isolate);
         auto resourceType = resource->getResourceType();
         auto converter = getWrappedValueConverter(resourceType);
         if (converter)
@@ -175,6 +188,7 @@ void script::modules::Resources::getResource(FunctionCallbackInfo const &args)
     }
     if (resource)
     {
+        resource->registerOnDestruct(&script::modules::Resources::onResourceDeleted, isolate);
         auto resourceType = resource->getResourceType();
         auto converter = getWrappedValueConverter(resourceType);
         if (converter)

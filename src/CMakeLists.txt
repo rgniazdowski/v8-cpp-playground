@@ -170,7 +170,6 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-D_DEBUG)
     add_definitions(-DDEBUG)
 endif()
-add_definitions(-D_HAS_AUTO_PTR_ETC=1)
 add_definitions(-DV8_31BIT_SMIS_ON_64BIT_ARCH=1)
 add_definitions(-DV8_COMPRESS_POINTERS)
 

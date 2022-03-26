@@ -765,8 +765,8 @@ namespace util
               direct(std::move(function))
         {
             this->wrap(direct);
-            FunctionType **fnPointer = direct.template target<FunctionType *>();
-            address = (size_t)*fnPointer;
+            auto *fnPointer = direct.template target<FunctionType>();
+            address = (size_t)(fnPointer != nullptr ? *fnPointer : 0);
         }
 
         virtual ~BindInfoFunction() {}
@@ -774,8 +774,8 @@ namespace util
         bool compare(FunctionType function) { return address == (size_t)function; }
         bool compare(const DirectFunction &function)
         {
-            FunctionType **fnPointer = function.template target<FunctionType *>();
-            size_t cmpaddr = (size_t)*fnPointer;
+            auto *fnPointer = function.template target<FunctionType>();
+            size_t cmpaddr = (size_t)(fnPointer != nullptr ? *fnPointer : 0);
             return address == cmpaddr;
         }
 

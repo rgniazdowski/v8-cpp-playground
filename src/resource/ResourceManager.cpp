@@ -30,6 +30,18 @@ bool resource::ResourceManager::destroy(void)
     if (!isInit())
         return false;
     m_thread.stop();
+    goToBegin();
+    while (isValid())
+    {
+        Resource *res = getCurrentResource();
+        if (!res)
+        {
+            goToNext();
+            continue;
+        }
+        destroyData(res);
+        goToBegin();
+    }
     m_init.store(false);
     return true;
 }
