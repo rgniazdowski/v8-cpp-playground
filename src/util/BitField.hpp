@@ -8,7 +8,7 @@
 
 namespace util
 {
-    template <int firstBit, int bitSize>
+    template <unsigned firstBit, unsigned bitSize>
     struct BitFieldMember
     {
         using self_type = BitFieldMember<firstBit, bitSize>;
@@ -16,7 +16,9 @@ namespace util
         enum
         {
             LAST_BIT = firstBit + bitSize - 1,
-            MASK = (1ULL << bitSize) - 1ULL
+            MASK = (1ULL << bitSize) - 1ULL,
+            FIRST_BIT_IDX = 8 - (firstBit & 7),
+            EXCESS_BITS_LAST_BYTE = 7 - (LAST_BIT & 7)
         };
 
         BitFieldMember() { assign(0); }
@@ -33,16 +35,16 @@ namespace util
         {
             const uint8_t *arr = selfArray();
             const uint8_t *p = arr + firstBit / 8;
-            int i = 8 - (firstBit & 7);
+            uint32_t idx = FIRST_BIT_IDX;
             uint32_t ret = 0;
             ret |= *p;
-            while (i < bitSize)
+            while (idx < bitSize)
             {
                 ret <<= 8;
                 ret |= *(++p);
-                i += 8;
+                idx += 8;
             }
-            return ((ret >> (7 - (LAST_BIT & 7))) & MASK);
+            return ((ret >> EXCESS_BITS_LAST_BYTE) & MASK);
         }
 
         /* used to assign a value into the field */
@@ -55,10 +57,10 @@ namespace util
         inline void assign(uint32_t value)
         {
             uint8_t *arr = selfArray();
-            value &= MASK;
-            uint32_t wmask = ~(MASK << (7 - (LAST_BIT & 7)));
-            value <<= (7 - (LAST_BIT & 7));
             uint8_t *p = arr + LAST_BIT / 8;
+            value &= MASK;
+            uint32_t wmask = ~(MASK << EXCESS_BITS_LAST_BYTE);
+            value <<= EXCESS_BITS_LAST_BYTE;
             int i = (LAST_BIT & 7) + 1;
             (*p &= wmask) |= value;
             while (i < bitSize)
