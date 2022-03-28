@@ -4,10 +4,11 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 
 add_executable(
     ${UNIT_TESTS_EXE}
-    testmain.cpp
-    bindings.cpp
-    timers.cpp
-    events.cpp
+    test-main.cpp
+    test-bindings.cpp
+    test-timers.cpp
+    test-events.cpp
+    test-bitfields.cpp
 )
 
 target_include_directories(${UNIT_TESTS_EXE} PUBLIC ${Catch2_SOURCE_DIR}/single_include)
