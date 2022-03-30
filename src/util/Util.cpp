@@ -2,6 +2,7 @@
 #include <Unistd.hpp>
 
 #include <sstream>
+#include <iterator>
 
 void util::transform_entries_to_paths(const DirEntriesVector &input, FileNamesVector &vec)
 {
@@ -523,19 +524,11 @@ const char *path::getAssetsPath(void)
 }
 //>---------------------------------------------------------------------------------------
 
-bool path::changeCurrentWorkingDir(const char *newPath)
-{
-    if (!newPath)
-        return false;
-    return chdir(newPath) < 0 ? false : true;
-}
-//>---------------------------------------------------------------------------------------
-
-bool path::changeCurrentWorkingDir(const std::string &newPath)
+bool path::changeCurrentWorkingDir(std::string_view newPath)
 {
     if (newPath.empty())
         return false;
-    return chdir(newPath.c_str()) < 0 ? false : true;
+    return chdir(newPath.data()) < 0 ? false : true;
 }
 //>---------------------------------------------------------------------------------------
 
@@ -569,6 +562,50 @@ void path::getCurrentWorkingPath(std::string &output_path)
 }
 //>---------------------------------------------------------------------------------------
 
+bool path::isAbsolute(std::string_view path)
+{
+    return std::filesystem::path(path).is_absolute();
+}
+//>---------------------------------------------------------------------------------------
+
+bool path::isRelative(std::string_view path)
+{
+    return std::filesystem::path(path).is_relative();
+}
+//>---------------------------------------------------------------------------------------
+
+std::string path::normalize(std::string_view path, std::string_view dirNameRoot)
+{
+    std::string absolute_path;
+    if (isAbsolute(path))
+        absolute_path = path;
+    else
+    {
+        absolute_path.reserve(dirNameRoot.length() + 1 + path.length() + 1);
+        absolute_path.append(dirNameRoot);
+        if (!strings::endsWith(absolute_path, "/"))
+            absolute_path.append("/");
+        absolute_path.append(path);
+    }
+    std::replace(absolute_path.begin(), absolute_path.end(), '\\', '/');
+    std::vector<std::string> segments;
+    std::istringstream segment_stream(absolute_path);
+    std::string segment;
+    while (std::getline(segment_stream, segment, '/'))
+    {
+        if (segment == "..")
+            segments.pop_back();
+        else if (segment != ".")
+            segments.push_back(segment);
+    }
+    std::ostringstream os;
+    std::copy(segments.begin(), segments.end() - 1,
+              std::ostream_iterator<std::string>(os, "/"));
+    os << *segments.rbegin();
+    return os.str();
+}
+//>---------------------------------------------------------------------------------------
+
 const char *path::fileExt(const char *path, bool fullExt)
 {
     if (!path)
@@ -589,8 +626,7 @@ const char *path::fileName(const char *path)
 {
     if (!path)
         return nullptr;
-    return (strrchr(path, '/') ? strrchr(path, '/') + 1 : strrchr(path, '\\') ? strrchr(path, '\\') + 1
-                                                                              : path);
+    return (strrchr(path, '/') ? strrchr(path, '/') + 1 : (strrchr(path, '\\') ? strrchr(path, '\\') + 1 : path));
 }
 //>---------------------------------------------------------------------------------------
 
@@ -624,16 +660,16 @@ char *path::dirName(const char *path)
 }
 //>---------------------------------------------------------------------------------------
 
-std::string path::dirName(std::string &path)
+std::string path::dirName(const std::string &path)
 {
     const char *filename = path::fileName(path.c_str());
     if (!filename)
         return path;
-    return path.substr(0, path.length() - strlen(filename));
+    return path.substr(0, path.length() - std::string_view(filename).length());
 }
 //>---------------------------------------------------------------------------------------
 
-std::string &path::dirName(std::string &path, std::string &dirpath)
+std::string &path::dirName(const std::string &path, std::string &dirpath)
 {
     dirpath.clear();
     dirpath.append(dirName(path));
@@ -652,9 +688,7 @@ void path::split(std::string &path, std::string &dirpath, std::string &filename)
 }
 //>---------------------------------------------------------------------------------------
 
-std::string &path::join(std::string &targetpath,
-                        const std::string &dirpath,
-                        const std::string &filename)
+std::string &path::join(std::string &targetpath, const std::string &dirpath, const std::string &filename)
 {
     // path - here is the result stored
 

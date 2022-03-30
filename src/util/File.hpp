@@ -64,6 +64,18 @@ namespace util
             return file.load();
         }
 
+        static inline std::string loadInPlaceAsString(std::string_view filePath)
+        {
+            self_type file(filePath);
+            // FIXME - should use just std::string as load result for util::File?
+            auto content = file.load();
+            if (!content)
+                return std::string();
+            auto casted = std::string(content);
+            delete[] content; // release the memory - it's copied to string
+            return casted;
+        }
+
         //>-------------------------------------------------------------------------------
 
         virtual std::string const &getPath(void) const override

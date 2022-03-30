@@ -88,9 +88,7 @@ namespace strings
     char *toUpper(const char *input);
 
     std::string trim(const std::string &str, const std::string &whitespace = " \t\r");
-
     std::string trim(const std::string &str, const char *whitespace);
-
     std::string trim(const char *str, const char *whitespace);
 
     std::string reduce(const std::string &str,
@@ -109,15 +107,12 @@ namespace strings
     bool isNumber(const std::string &string);
 
     bool equals(const std::string &input, const std::string &pattern, const bool caseSensitive = true);
-
     bool equals(const char *input, const char *pattern, const bool caseSensitive = true);
 
     bool startsWith(const std::string &input, const std::string &pattern, const bool caseSensitive = true);
-
     bool startsWith(const char *input, const char *pattern, bool caseSensitive = true);
 
     bool endsWith(const std::string &input, const std::string &pattern, bool caseSensitive = true);
-
     bool endsWith(const char *input, const char *pattern, bool caseSensitive = true);
 
     bool containsChars(const std::string &input, const std::string &chars);
@@ -150,22 +145,24 @@ namespace path
 
     const char *getAssetsPath(void);
 
-    bool changeCurrentWorkingDir(const char *newPath);
-    bool changeCurrentWorkingDir(const std::string &newPath);
+    bool changeCurrentWorkingDir(std::string_view newPath);
 
     char *getCurrentWorkingPath(char *buffer, size_t maxlen);
-
     std::string getCurrentWorkingPath(void);
-
     void getCurrentWorkingPath(std::string &output_path);
+
+    bool isAbsolute(std::string_view path);
+    bool isRelative(std::string_view path);
+
+    std::string normalize(std::string_view path, std::string_view dirNameRoot);
 
     const char *fileExt(const char *path, bool fullExt = false);
     const char *fileName(const char *path);
 
     void dirName(char *path);
     char *dirName(const char *path);
-    std::string dirName(std::string &path);
-    std::string &dirName(std::string &path, std::string &dir);
+    std::string dirName(const std::string &path);
+    std::string &dirName(const std::string &path, std::string &dir);
 
     void split(std::string &path, std::string &dirpath, std::string &filename);
 

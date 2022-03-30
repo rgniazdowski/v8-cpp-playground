@@ -169,7 +169,7 @@ char *util::RegularFile::load(void)
     {
         // FG_MessageSubsystem->reportWarning(tag_type::name(), FG_ERRNO_FILE_READ_COUNT, "%s", filePath);
         // fgFree(fileBuffer);
-        delete fileBuffer;
+        delete[] fileBuffer;
         fileBuffer = nullptr;
         fileSize = 0;
         close();
