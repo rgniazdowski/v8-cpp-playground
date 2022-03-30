@@ -52,8 +52,7 @@ namespace script
         virtual bool initialize(void) override;
         virtual bool destroy(void) override;
 
-        bool scriptCallbackHandler(const util::WrappedArgs &args);
-
+        inline v8::Isolate *getIsolate(void) { return m_isolate; }
         LocalContext getContext(const std::string &name = "main");
         LocalContext createContext(const std::string &name);
 
@@ -63,7 +62,7 @@ namespace script
         void releaseModules(void);
         void clearContexts(void);
 
-        inline v8::Isolate *getIsolate(void) { return m_isolate; }
+        //#-------------------------------------------------------------------------------
 
         ScriptCallback *createScriptCallback(void);
         ScriptCallback *createScriptCallback(const LocalFunction &function);
@@ -72,9 +71,96 @@ namespace script
         ScriptTimerCallback *createScriptTimerCallback(const LocalFunction &function);
         ScriptTimerCallback *createScriptTimerCallback(const LocalFunction &function, std::vector<LocalValue> const &args);
 
+        bool scriptCallbackHandler(const util::WrappedArgs &args);
+        //#-------------------------------------------------------------------------------
+
+        static void onModuleResolutionSuccess(const FunctionCallbackInfo &info);
+
+        static void onModuleResolutionFailure(const FunctionCallbackInfo &info);
+
+        static MaybeLocalPromise onHostImportModuleDynamically(LocalContext context,
+                                                               LocalScriptOrModule referrer,
+                                                               LocalString specifier);
+        static void doHostImportModuleDynamically(void *import_data);
+
+        static void onHostInitializeImportMetaObject(LocalContext context,
+                                                     LocalModule module, LocalObject meta);
+
+        static MaybeLocalModule onResolveModule(LocalContext context,
+                                                LocalString specifier,
+                                                LocalModule referrer);
+
     protected:
+        MaybeLocalModule fetchModuleTree(LocalContext context, std::string_view filePath);
+
+        bool executeModule(std::string_view filePath);
+
+        bool internalProcessMessages(v8::Isolate *isolate,
+                                     const std::function<v8::platform::MessageLoopBehavior()> &behavior);
+
+        bool internalEmptyMessageQueues(v8::Isolate *isolate);
+
         void processPendingCallbacks(void);
 
+        struct DynamicImportData
+        {
+            DynamicImportData(v8::Isolate *isolate_, LocalString referrer_,
+                              LocalString specifier_, LocalResolver resolver_)
+                : isolate(isolate_)
+            {
+                referrer.Reset(isolate, referrer_);
+                specifier.Reset(isolate, specifier_);
+                resolver.Reset(isolate, resolver_);
+            }
+            v8::Isolate *isolate;
+            GlobalString referrer;
+            GlobalString specifier;
+            GlobalResolver resolver;
+        };
+        //#-------------------------------------------------------------------------------
+        struct ModuleResolutionData
+        {
+            ModuleResolutionData(v8::Isolate *isolate_, LocalValue module_namespace_,
+                                 LocalResolver resolver_, LocalContext context_)
+                : isolate(isolate_)
+            {
+                module_namespace.Reset(isolate, module_namespace_);
+                resolver.Reset(isolate, resolver_);
+                context.Reset(isolate, context_);
+            }
+            v8::Isolate *isolate;
+            GlobalValue module_namespace;
+            GlobalResolver resolver;
+            GlobalContext context;
+        };
+        //#-------------------------------------------------------------------------------
+        class ModuleEmbedderData
+        {
+        private:
+            class ModuleGlobalHash
+            {
+            public:
+                explicit ModuleGlobalHash(v8::Isolate *isolate) : isolate_(isolate) {}
+                size_t operator()(const GlobalModule &module) const
+                {
+                    return module.Get(isolate_)->GetIdentityHash();
+                }
+
+            private:
+                v8::Isolate *isolate_;
+            };
+
+        public:
+            explicit ModuleEmbedderData(v8::Isolate *isolate) : module_to_specifier_map(10, ModuleGlobalHash(isolate)) {}
+
+            // Map from normalized module specifier to Module.
+            std::unordered_map<std::string, GlobalModule> specifier_to_module_map;
+            // Map from Module to its URL as defined in the ScriptOrigin
+            std::unordered_map<GlobalModule, std::string, ModuleGlobalHash> module_to_specifier_map;
+        };
+        ModuleEmbedderData *getModuleDataForContext(const std::string &name = "main");
+        ModuleEmbedderData *getModuleDataForContext(LocalContext context);
+        //#-------------------------------------------------------------------------------
     protected:
         char **m_argv;
         v8::Isolate::CreateParams m_createParams;
@@ -85,7 +171,7 @@ namespace script
         /// with isolate and context 'entered' and 'locked'.
         v8::Isolate *m_isolate;
         std::unique_ptr<v8::Platform> m_platform;
-
+        //#-------------------------------------------------------------------------------
         /**
          * Wrap around a persistent context so it can have move constructor and placed in
          * STL container like map. Ideally contexts will be mapped with a string key.
@@ -97,21 +183,36 @@ namespace script
             v8::Isolate *isolate;
             PersistentContext self;
             std::vector<std::string> modules;
-            WrappedContext() : isolate(nullptr), self() {}
-            WrappedContext(v8::Isolate *_isolate, LocalContext &_context) : isolate(_isolate), self()
+            std::unique_ptr<ModuleEmbedderData> embedderData; // FIXME - module embedder data / per context config
+            WrappedContext() : isolate(nullptr), self(), modules(), embedderData() {}
+            WrappedContext(v8::Isolate *_isolate, LocalContext &_context)
+                : isolate(_isolate), self(), modules(), embedderData()
             {
+                embedderData.reset(new ModuleEmbedderData(_isolate));
+                _context->SetAlignedPointerInEmbedderData(0, embedderData.get());
                 self.Reset(isolate, _context);
             }
             WrappedContext(const WrappedContext &other) = delete;
-            WrappedContext(WrappedContext &&other) : isolate(other.isolate)
+            WrappedContext(WrappedContext &&other) : isolate(other.isolate), embedderData(std::move(other.embedderData))
             {
                 self.Reset(isolate, other.self);
                 other.self.Reset();
             }
             ~WrappedContext()
             {
-                self.Reset(); // can only do a simple reset - dispose should be called before
+                // Best to call this before disposing of the isolate and dependent contexts
+                if (isolate)
+                {
+                    v8::HandleScope handle_scope(isolate);
+                    if (!self.IsEmpty())
+                    {
+                        auto context = local();
+                        if (!context.IsEmpty())
+                            context->SetAlignedPointerInEmbedderData(0, nullptr);
+                    }
+                }
                 isolate = nullptr;
+                self.Reset();
             }
             inline LocalContext local() const { return self.Get(isolate); }
             inline LocalContext local(v8::Isolate *_isolate) const { return self.Get(_isolate); }
@@ -134,6 +235,7 @@ namespace script
                 util::remove(modules, (size_t)idx);
             }
         }; //# struct WrappedContext
+        //#-------------------------------------------------------------------------------
         bool instantiateGlobals(LocalContext &context, WrappedContext &wrappedContext);
         using ContextCache = std::unordered_map<std::string, WrappedContext>;
         ContextCache m_contexts;
@@ -178,6 +280,7 @@ namespace script
                 numArgs = 0;
             }
         }; //# struct PendingCallback
+        //#-------------------------------------------------------------------------------
         std::stack<PendingCallback> m_pendingCallbacks;
         std::mutex m_mutex;
     }; //# class ScriptManager
