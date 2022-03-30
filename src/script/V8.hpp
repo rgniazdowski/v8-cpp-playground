@@ -47,16 +47,32 @@ namespace script
     using GlobalObject = v8::Global<v8::Object>;
     using GlobalFunction = v8::Global<v8::Function>;
     using GlobalValue = v8::Global<v8::Value>;
+    using GlobalString = v8::Global<v8::String>;
     using GlobalProxy = v8::Global<v8::Proxy>;
     using GlobalContext = v8::Global<v8::Context>;
+    using GlobalPromise = v8::Global<v8::Promise>;
+    using GlobalResolver = v8::Global<v8::Promise::Resolver>;
+    using GlobalModule = v8::Global<v8::Module>;
 
     using LocalObject = v8::Local<v8::Object>;
+    using LocalExternal = v8::Local<v8::External>;
     using LocalFunction = v8::Local<v8::Function>;
     using LocalValue = v8::Local<v8::Value>;
     using LocalProxy = v8::Local<v8::Proxy>;
     using LocalString = v8::Local<v8::String>;
+    using LocalInteger = v8::Local<v8::Integer>;
+    using LocalBoolean = v8::Local<v8::Boolean>;
     using LocalScript = v8::Local<v8::Script>;
+    using LocalScriptOrModule = v8::Local<v8::ScriptOrModule>;
+    using LocalModule = v8::Local<v8::Module>;
     using LocalContext = v8::Local<v8::Context>;
+    using LocalPromise = v8::Local<v8::Promise>;
+    using LocalResolver = v8::Local<v8::Promise::Resolver>;
+
+    using MaybeLocalValue = v8::MaybeLocal<v8::Value>;
+    using MaybeLocalModule = v8::MaybeLocal<v8::Module>;
+    using MaybeLocalPromise = v8::MaybeLocal<v8::Promise>;
+    using MaybeLocalResolver = v8::MaybeLocal<v8::Promise::Resolver>;
 
     using PersistentObject = v8::Persistent<v8::Object, v8::CopyablePersistentTraits<v8::Object>>;
     using PersistentFunction = v8::Persistent<v8::Function, v8::CopyablePersistentTraits<v8::Function>>;
