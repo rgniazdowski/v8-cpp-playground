@@ -61,6 +61,7 @@ namespace script
         Module *getModule(const std::string &name);
         bool hasModule(const std::string &name) const;
         void releaseModules(void);
+        void clearContexts(void);
 
         inline v8::Isolate *getIsolate(void) { return m_isolate; }
 

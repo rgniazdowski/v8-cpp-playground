@@ -79,28 +79,14 @@ bool script::ScriptManager::initialize(void)
         v8::Isolate::Scope isolate_scope(m_isolate);
         // Create a stack-allocated handle scope.
         v8::HandleScope handle_scope(m_isolate);
+        std::initializer_list<script::InternalModule *> modules = {
+            new modules::Console(m_isolate),  /* Need to create and initialize list of globals and built-in modules. */
+            new modules::Timers(m_isolate),   /* Timers wrapped - create callbacks and timers on EventManager */
+            new modules::Events(m_isolate),   /* Events - this is EventManager global along with additional info */
+            new modules::Resources(m_isolate) /* Resources - this is ResourceManager global along with additional info */
+        };
+        for (auto module : modules)
         {
-            // Need to create and initialize list of globals and built-in modules.
-            auto module = new modules::Console(m_isolate);
-            module->initialize();
-            registerModule(module);
-        }
-        {
-            modules::Timers::s_pScriptMgr = this;
-            // Timers wrapped - create callbacks and timers on EventManager
-            auto module = new modules::Timers(m_isolate);
-            module->initialize();
-            registerModule(module);
-        }
-        {
-            // Events - this is EventManager global along with additional info
-            auto module = new modules::Events(m_isolate);
-            module->initialize();
-            registerModule(module);
-        }
-        {
-            // Resources - this is ResourceManager global along with additional info
-            auto module = new modules::Resources(m_isolate);
             module->initialize();
             registerModule(module);
         }
@@ -156,7 +142,7 @@ bool script::ScriptManager::destroy(void)
     signalThread();
     stopThread();
     releaseModules();
-    m_contexts.clear(); // reset the context map completely
+    clearContexts();
     // Dispose the isolate and tear down V8.
     m_isolate->Dispose();
     v8::V8::Dispose();
@@ -255,6 +241,16 @@ void script::ScriptManager::releaseModules(void)
     }
     m_modules.clear();
 } //> releaseModules()
+//>#--------------------------------------------------------------------------------------
+
+void script::ScriptManager::clearContexts(void)
+{
+    const std::lock_guard<std::mutex> lock(m_mutex);
+    v8::Locker locker(m_isolate);
+    v8::Isolate::Scope isolate_scope(m_isolate);
+    v8::HandleScope handle_scope(m_isolate);
+    m_contexts.clear(); // reset the context map completely
+} //> clearContexts()
 //>#--------------------------------------------------------------------------------------
 
 script::ScriptCallback *script::ScriptManager::createScriptCallback(void)
