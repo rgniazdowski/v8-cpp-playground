@@ -80,7 +80,7 @@ void script::modules::Timers::setTimerWrapper(int repeats, FunctionCallbackInfo 
         auto expression = handler.As<v8::String>();
         callback = s_pScriptMgr->createScriptCallback(expression);
     }
-    auto id = eventMgr->addInterval((int)timeout, callback, repeats);
+    auto id = eventMgr->addInterval(callback, (int)timeout, repeats);
     args.GetReturnValue().Set(id);
     localHandlerArgs.clear();
 } //> setTimerWrapper(...)

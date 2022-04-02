@@ -295,7 +295,7 @@ void script::modules::Events::addCallback(FunctionCallbackInfo const &args)
     }
     auto managerRegistry = base::ManagerRegistry::instance();
     auto eventMgr = managerRegistry->get<event::EventManager>();
-    eventMgr->addCallback(nativeEventType, callback);
+    eventMgr->addCallback(callback, nativeEventType);
     auto callbackObject = v8pp::class_<util::Callback>::reference_external(isolate, callback);
     args.GetReturnValue().Set(callbackObject);
 }

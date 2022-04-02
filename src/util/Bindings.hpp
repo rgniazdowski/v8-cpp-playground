@@ -709,17 +709,14 @@ namespace util
     }; //# BindInfoMethodWrapped
     //#-----------------------------------------------------------------------------------
 
-    /**
-     * @brief
-     *
-     * @tparam ReturnType
-     * @tparam Args
-     */
-    template <typename ReturnType, typename... Args>
+    template <typename FunctionType,
+              typename Traits = util::function_traits<FunctionType>,
+              typename UserClass = typename Traits::class_type,
+              typename ReturnType = typename Traits::result_type>
     class BindInfoFunction : public BindInfo, public virtual BindInfoFunctionWrapped
     {
-        using DirectFunction = std::function<ReturnType(Args...)>;
-        using FunctionType = ReturnType (*)(Args...);
+        static_assert(std::is_same_v<void, UserClass>, "Cannot create binding for member function");
+        using DirectFunction = typename Traits::std_function;
 
     private:
         DirectFunction direct;
@@ -750,7 +747,7 @@ namespace util
                          FunctionType function,
                          const std::initializer_list<std::string> &argNames = {})
             : BindInfo(functionName, FUNCTION),
-              BindInfoFunctionWrapped(argNames, {std::string(typeid(Args).name())...}, typeid(ReturnType).name()),
+              BindInfoFunctionWrapped(argNames, util::args_typeid_names<FunctionType>(), typeid(ReturnType).name()),
               direct(function)
         {
             this->wrap(direct);
@@ -761,7 +758,7 @@ namespace util
                          DirectFunction &function,
                          const std::initializer_list<std::string> &argNames = {})
             : BindInfo(functionName, FUNCTION),
-              BindInfoFunctionWrapped(argNames, {std::string(typeid(Args).name())...}, typeid(ReturnType).name()),
+              BindInfoFunctionWrapped(argNames, util::args_typeid_names<FunctionType>(), typeid(ReturnType).name()),
               direct(std::move(function))
         {
             this->wrap(direct);
@@ -779,26 +776,23 @@ namespace util
             return address == cmpaddr;
         }
 
+        template <typename... Args>
         ReturnType call(Args &&...args) const
         {
             if (this->type == FUNCTION && this->direct)
                 return this->direct(std::forward<Args>(args)...); // call anyway
-            throw std::invalid_argument("Unable to call function - it's not available");
+            throw std::invalid_argument("Unable to call function '" + this->getName() + "' - it's not available");
         }
 
         ReturnType callWithArgs(const WrappedArgs &args) const
         {
             if (this->type == FUNCTION && this->direct)
                 return unpack_caller(this->direct, args);
-            throw std::invalid_argument("Unable to call function - it's not available");
+            throw std::invalid_argument("Unable to call function '" + this->getName() + "' - it's not available");
         }
-    }; //# class BindInfoFunction
+    }; //# class BindInfoFunction<FunctionType>
     //#-----------------------------------------------------------------------------------
 
-    /**
-     * @brief
-     *
-     */
     class BindInfoMethodWrapped : public BindInfoFunctionWrappedBase
     {
     public:
@@ -821,27 +815,20 @@ namespace util
                 return wrappedMethod(static_cast<void *>(pObject), args);
             return WrappedValue(); // empty
         }
-
     }; //# BindInfoMethodWrapped
     //#-----------------------------------------------------------------------------------
 
-    /**
-     * @brief
-     *
-     * @tparam UserClass
-     * @tparam ReturnType
-     * @tparam Args
-     */
-    template <typename UserClass, typename ReturnType, typename... Args>
+    template <typename MethodType,
+              typename Traits = util::function_traits<MethodType>,
+              typename UserClass = typename Traits::class_type,
+              typename ReturnType = typename Traits::result_type>
     class BindInfoMethod : public BindInfo, public virtual BindInfoMethodWrapped
     {
-        using DirectMethod = ReturnType (UserClass::*)(Args...);
-
     private:
-        DirectMethod direct;
+        MethodType direct;
 
         template <bool is_pointer = std::is_pointer<ReturnType>::value>
-        typename std::enable_if<is_pointer == true>::type wrap(DirectMethod methodMember)
+        typename std::enable_if<is_pointer == true>::type wrap(MethodType methodMember)
         {
             this->wrappedMethod = [methodMember](void *pObject, const WrappedArgs &args)
             {
@@ -851,7 +838,7 @@ namespace util
         }
 
         template <bool is_pointer = std::is_pointer<ReturnType>::value>
-        typename std::enable_if<is_pointer == false>::type wrap(DirectMethod methodMember)
+        typename std::enable_if<is_pointer == false>::type wrap(MethodType methodMember)
         {
             this->wrappedMethod = [methodMember](void *pObject, const WrappedArgs &args)
             {
@@ -862,10 +849,10 @@ namespace util
 
     public:
         BindInfoMethod(std::string_view methodName,
-                       DirectMethod methodMember,
+                       MethodType methodMember,
                        const std::initializer_list<std::string> &argNames = {})
             : BindInfo(methodName, METHOD),
-              BindInfoMethodWrapped(argNames, {std::string(typeid(Args).name())...}, typeid(ReturnType).name()),
+              BindInfoMethodWrapped(argNames, util::args_typeid_names<MethodType>(), typeid(ReturnType).name()),
               direct(methodMember)
         {
             this->wrap(methodMember);
@@ -873,24 +860,23 @@ namespace util
 
         virtual ~BindInfoMethod() {}
 
-        bool compare(DirectMethod methodMember) { return direct == methodMember; }
+        bool compare(MethodType methodMember) { return direct == methodMember; }
 
+        template <typename... Args>
         ReturnType call(UserClass *pObject, Args &&...args) const
         {
-            if (this->type == METHOD && this->direct)
-            {
+            if (this->type == METHOD && this->direct && pObject)
                 return (pObject->*(this->direct))(std::forward<Args>(args)...); // call anyway
-            }
-            throw std::invalid_argument("Unable to call member method - it's a property");
+            throw std::invalid_argument("Unable to call member method '" + this->getName() + "'");
         }
 
         ReturnType callWithArgs(UserClass *pObject, const WrappedArgs &args) const
         {
             if (this->type == METHOD && this->direct)
                 return unpack_caller(pObject, this->direct, args);
-            throw std::invalid_argument("Unable to call member method - it's a property");
+            throw std::invalid_argument("Unable to call member method '" + this->getName() + "'");
         }
-    }; //# class BindInfoMethod
+    }; //# class BindInfoMethod<MethodType>
     //#-----------------------------------------------------------------------------------
 
     /**
@@ -899,10 +885,17 @@ namespace util
      * @tparam ReturnType
      * @tparam Args
      */
-    template <typename ReturnType, typename... Args>
-    class BindInfoMethod<void, ReturnType, Args...> : public BindInfo, public virtual BindInfoMethodWrapped
+    template <typename MethodType>
+    class BindInfoMethod<MethodType,
+                         util::function_traits<MethodType>,
+                         void,
+                         typename util::function_traits<MethodType>::result_type> : public BindInfo,
+                                                                                    public virtual BindInfoMethodWrapped
     {
-        using DirectMethod = ReturnType (*)(Args...);
+        using DirectMethod = MethodType;
+        using Traits = util::function_traits<MethodType>;
+        using UserClass = void;
+        using ReturnType = typename Traits::result_type;
 
     private:
         DirectMethod direct;
@@ -932,7 +925,7 @@ namespace util
                        DirectMethod function,
                        const std::initializer_list<std::string> &argNames = {})
             : BindInfo(functionName, METHOD),
-              BindInfoMethodWrapped(argNames, {std::string(typeid(Args).name())...}, typeid(ReturnType).name()),
+              BindInfoMethodWrapped(argNames, util::args_typeid_names<MethodType>(), typeid(ReturnType).name()),
               direct(function)
         {
             this->wrap(function);
@@ -940,20 +933,19 @@ namespace util
 
         virtual ~BindInfoMethod() {}
 
+        template <typename... Args>
         ReturnType call(void *pObject, Args &&...args) const
         {
             if (this->type == METHOD && this->direct)
-            {
                 return this->direct(std::forward<Args>(args)...); // call anyway
-            }
-            throw std::invalid_argument("Unable to call member method - it's a property");
+            throw std::invalid_argument("Unable to call member method / function '" + this->getName() + "'");
         }
 
         ReturnType callWithArgs(void *pObject, const WrappedArgs &args) const
         {
             if (this->type == METHOD && this->direct)
                 return unpack_caller(this->direct, args);
-            throw std::invalid_argument("Unable to call member method - it's a property");
+            throw std::invalid_argument("Unable to call member method / function '" + this->getName() + "'");
         }
     }; //# class BindInfoMethod<void>
     //#-----------------------------------------------------------------------------------
@@ -1227,29 +1219,34 @@ namespace util
 
         const BindInfo::Bindings &getBindings(void) const noexcept { return bindings; }
 
-        template <typename ReturnType, typename... Args>
-        self_type &function(std::string_view functionName, ReturnType (*function)(Args...), const std::initializer_list<std::string> &argNames = {})
+        template <typename FunctionType>
+        self_type &function(std::string_view functionName, FunctionType function,
+                            const std::initializer_list<std::string> &argNames = {})
         {
-            bindings.push_back(new BindInfoFunction<ReturnType, Args...>(functionName, function, argNames));
+            bindings.push_back(new BindInfoFunction<FunctionType>(functionName, function, argNames));
             return *this;
         }
 
-        template <typename UserClass, typename ReturnType, typename... Args>
-        self_type &method(std::string_view methodName, ReturnType (UserClass::*methodMember)(Args...), const std::initializer_list<std::string> &argNames = {})
+        template <typename MethodType>
+        self_type &method(std::string_view methodName, MethodType methodMember,
+                          const std::initializer_list<std::string> &argNames = {})
         {
-            bindings.push_back(new BindInfoMethod<UserClass, ReturnType, Args...>(methodName, methodMember, argNames));
+            bindings.push_back(new BindInfoMethod<MethodType>(methodName, methodMember, argNames));
             return *this;
         }
 
         template <typename UserClass, typename ReturnType>
-        self_type &property(std::string_view propertyName, ReturnType (UserClass::*getter)() const, void (UserClass::*setter)(ReturnType))
+        self_type &property(std::string_view propertyName,
+                            ReturnType (UserClass::*getter)() const,
+                            void (UserClass::*setter)(ReturnType))
         {
             bindings.push_back(new BindInfoProperty<UserClass, ReturnType>(propertyName, getter, setter));
             return *this;
         }
 
         template <typename UserClass, typename ReturnType>
-        self_type &property(std::string_view propertyName, ReturnType (UserClass::*getter)() const)
+        self_type &property(std::string_view propertyName,
+                            ReturnType (UserClass::*getter)() const)
         {
             bindings.push_back(new BindInfoProperty<UserClass, ReturnType>(propertyName, getter));
             return *this;
@@ -1325,53 +1322,53 @@ namespace util
         BindingHelper(const BindingHelper &other) = delete;
         //>-------------------------------------------------------------------------------
 
-        template <typename UserClass, typename ReturnType, typename... Args>
-        static bool compare(const BindInfo *pBinding, ReturnType (UserClass::*methodMember)(Args...))
+        template <typename FunctionOrMethodType>
+        static bool compare(const BindInfo *pBinding, FunctionOrMethodType functionOrMethod)
         {
             if (pBinding->isMethod())
-                return static_cast<const BindInfoMethod<UserClass, ReturnType, Args...> *>(pBinding)->compare(methodMember);
-            return false;
-        }
-        //>-------------------------------------------------------------------------------
-
-        template <typename ReturnType, typename... Args>
-        static bool compare(const BindInfo *pBinding, ReturnType (*function)(Args...))
-        {
+                return static_cast<const BindInfoMethod<FunctionOrMethodType> *>(pBinding)->compare(functionOrMethod);
             if (pBinding->isFunction())
-                return static_cast<const BindInfoFunction<ReturnType, Args...> *>(pBinding)->compare(function);
+                return static_cast<const BindInfoFunction<FunctionOrMethodType> *>(pBinding)->compare(functionOrMethod);
             return false;
         }
         //>-------------------------------------------------------------------------------
 
-        template <typename UserClass, typename ReturnType, typename... Args>
+        template <typename FunctionOrMethodType,
+                  typename Traits = util::function_traits<FunctionOrMethodType>,
+                  typename UserClass = typename Traits::class_type,
+                  typename ReturnType = typename Traits::result_type, typename... Args>
         static ReturnType call(UserClass *pObject, const BindInfo *pBinding, Args &&...args)
         {
             if (pBinding->isFunction())
-                return BindingHelper::callFunction<ReturnType, Args...>(pBinding, std::forward<Args>(args)...);
+                return BindingHelper::callFunction<FunctionOrMethodType>(pBinding, std::forward<Args>(args)...);
             if (pBinding->isMethod())
-                return BindingHelper::callMethod<UserClass, ReturnType, Args...>(pObject, pBinding, std::forward<Args>(args)...);
+                return BindingHelper::callMethod<FunctionOrMethodType>(pObject, pBinding, std::forward<Args>(args)...);
             throw std::invalid_argument("Unable to call binding - not a function / method");
         }
         //>-------------------------------------------------------------------------------
 
-        template <typename ReturnType, typename... Args>
+        template <typename FunctionType,
+                  typename Traits = util::function_traits<FunctionType>,
+                  typename ReturnType = typename Traits::result_type, typename... Args>
         static ReturnType callFunction(const BindInfo *pBinding, Args &&...args)
         {
             if (pBinding->isFunction())
             {
-                auto pBindingCast = static_cast<const BindInfoFunction<ReturnType, Args...> *>(pBinding);
+                auto pBindingCast = static_cast<const BindInfoFunction<FunctionType> *>(pBinding);
                 return pBindingCast->call(std::forward<Args>(args)...); // direct
             }
             throw std::invalid_argument("Unable to call binding - not a function");
         }
         //>-------------------------------------------------------------------------------
 
-        template <typename UserClass, typename ReturnType, typename... Args>
+        template <typename MethodType, typename Traits = util::function_traits<MethodType>,
+                  typename UserClass = typename Traits::class_type,
+                  typename ReturnType = typename Traits::result_type, typename... Args>
         static ReturnType callMethod(UserClass *pObject, const BindInfo *pBinding, Args &&...args)
         {
             if (pBinding->isMethod())
             {
-                auto pBindingCast = static_cast<const BindInfoMethod<UserClass, ReturnType, Args...> *>(pBinding);
+                auto pBindingCast = static_cast<const BindInfoMethod<MethodType> *>(pBinding);
                 return pBindingCast->call(pObject, std::forward<Args>(args)...); // direct
             }
             throw std::invalid_argument("Unable to call binding - not a method");
@@ -1485,17 +1482,20 @@ namespace util
         void setObject(UserClass *object) { pObject = object; }
 
     public:
-        template <typename ReturnType, typename... Args>
+        /*template <typename ReturnType, typename... Args>
         ReturnType call(std::string_view name, Args &&...args)
         {
+            // FIXME This will fail if wrapped method was const!
+            using DirectMethod = ReturnType (UserClass::*)(Args...);
             auto pBinding = pMetadata->get(BindInfo::METHOD, name);
             if (pBinding != nullptr)
-                return BindingHelper::callMethod<UserClass, ReturnType, Args...>(pObject, pBinding, std::forward<Args>(args)...); // direct
+                return BindingHelper::callMethod<DirectMethod>(pObject, pBinding, std::forward<Args>(args)...); // direct
             pBinding = pMetadata->get(BindInfo::FUNCTION, name);
             if (pBinding != nullptr)
                 return BindingHelper::callFunction<ReturnType, Args...>(pBinding, std::forward<Args>(args)...); // direct
             throw std::invalid_argument("Unable to find bound method / function");
         }
+        */
 
         template <typename ReturnType>
         ReturnType get(std::string_view name)

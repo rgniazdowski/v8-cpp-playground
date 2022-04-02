@@ -3,15 +3,41 @@
 #define FG_INC_UTIL_UNPACK_CALLER
 
 #include <tuple>
+#include <string>
+#include <vector>
+#include <functional>
 
 namespace util
 {
-    template <typename ReturnType, typename... Args>
+    template <typename... Args>
+    struct args_pack
+    {
+    };
+
+    template <typename... Args>
+    inline std::vector<std::string> args_typeid_names(args_pack<Args...>)
+    {
+        return std::vector<std::string>({std::string(typeid(Args).name())...});
+    }
+
+    template <typename FuncType,
+              typename Traits = function_traits<FuncType>,
+              typename ArgsType = typename Traits::args>
+    inline std::vector<std::string> args_typeid_names(void)
+    {
+        return args_typeid_names(ArgsType());
+    }
+
+    template <typename ClassType, typename ReturnType, typename... Args>
     struct function_traits_defs
     {
         static constexpr size_t arity = sizeof...(Args);
 
+        using std_function = std::function<ReturnType(Args...)>;
         using result_type = ReturnType;
+        using args = args_pack<Args...>;
+        using args_tuple = std::tuple<Args...>;
+        using class_type = ClassType;
 
         template <size_t i>
         struct arg
@@ -19,86 +45,102 @@ namespace util
             using type = typename std::tuple_element<i, std::tuple<Args...>>::type;
         };
     };
+
+    template <>
+    struct function_traits_defs<void, void>
+    {
+        static constexpr size_t arity = 0;
+        using std_function = std::function<void()>;
+        using result_type = void;
+        using args = args_pack<void>;
+        using args_tuple = void;
+        using class_type = void;
+
+        template <size_t i>
+        struct arg
+        {
+            using type = void;
+        };
+    };
     //#-----------------------------------------------------------------------------------
 
     template <typename T>
-    struct function_traits_impl;
+    struct function_traits_impl : function_traits_defs<void, void> {};
 
     template <typename ReturnType, typename... Args>
     struct function_traits_impl<ReturnType(Args...)>
-        : function_traits_defs<ReturnType, Args...>
+        : function_traits_defs<void, ReturnType, Args...>
     {
     };
 
     template <typename ReturnType, typename... Args>
     struct function_traits_impl<ReturnType (*)(Args...)>
-        : function_traits_defs<ReturnType, Args...>
+        : function_traits_defs<void, ReturnType, Args...>
     {
     };
 
     template <typename ClassType, typename ReturnType, typename... Args>
     struct function_traits_impl<ReturnType (ClassType::*)(Args...)>
-        : function_traits_defs<ReturnType, Args...>
+        : function_traits_defs<ClassType, ReturnType, Args...>
     {
     };
 
     template <typename ClassType, typename ReturnType, typename... Args>
     struct function_traits_impl<ReturnType (ClassType::*)(Args...) const>
-        : function_traits_defs<ReturnType, Args...>
+        : function_traits_defs<ClassType, ReturnType, Args...>
     {
     };
 
     template <typename ClassType, typename ReturnType, typename... Args>
     struct function_traits_impl<ReturnType (ClassType::*)(Args...) const &>
-        : function_traits_defs<ReturnType, Args...>
+        : function_traits_defs<ClassType, ReturnType, Args...>
     {
     };
 
     template <typename ClassType, typename ReturnType, typename... Args>
     struct function_traits_impl<ReturnType (ClassType::*)(Args...) const &&>
-        : function_traits_defs<ReturnType, Args...>
+        : function_traits_defs<ClassType, ReturnType, Args...>
     {
     };
 
     template <typename ClassType, typename ReturnType, typename... Args>
     struct function_traits_impl<ReturnType (ClassType::*)(Args...) volatile>
-        : function_traits_defs<ReturnType, Args...>
+        : function_traits_defs<ClassType, ReturnType, Args...>
     {
     };
 
     template <typename ClassType, typename ReturnType, typename... Args>
     struct function_traits_impl<ReturnType (ClassType::*)(Args...) volatile &>
-        : function_traits_defs<ReturnType, Args...>
+        : function_traits_defs<ClassType, ReturnType, Args...>
     {
     };
 
     template <typename ClassType, typename ReturnType, typename... Args>
     struct function_traits_impl<ReturnType (ClassType::*)(Args...) volatile &&>
-        : function_traits_defs<ReturnType, Args...>
+        : function_traits_defs<ClassType, ReturnType, Args...>
     {
     };
 
     template <typename ClassType, typename ReturnType, typename... Args>
     struct function_traits_impl<ReturnType (ClassType::*)(Args...) const volatile>
-        : function_traits_defs<ReturnType, Args...>
+        : function_traits_defs<ClassType, ReturnType, Args...>
     {
     };
 
     template <typename ClassType, typename ReturnType, typename... Args>
     struct function_traits_impl<ReturnType (ClassType::*)(Args...) const volatile &>
-        : function_traits_defs<ReturnType, Args...>
+        : function_traits_defs<ClassType, ReturnType, Args...>
     {
     };
 
     template <typename ClassType, typename ReturnType, typename... Args>
     struct function_traits_impl<ReturnType (ClassType::*)(Args...) const volatile &&>
-        : function_traits_defs<ReturnType, Args...>
+        : function_traits_defs<ClassType, ReturnType, Args...>
     {
     };
 
     template <typename T, typename V = void>
-    struct function_traits
-        : function_traits_impl<T>
+    struct function_traits : function_traits_impl<T>
     {
     };
 
@@ -164,9 +206,7 @@ namespace util
                   typename ReturnType = typename Traits::result_type,
                   typename FirstArg = Traits::arg<0>>
         std::enable_if_t<Traits::arity == 1, ReturnType>
-        do_call(FuncType func,
-                VecType &args,
-                indices<I...>)
+        do_call(FuncType func, VecType &args, indices<I...>)
         {
             using FirstArgType = typename FirstArg::type; //> select first argument type
             assert(args.size() >= Traits::arity);
@@ -180,9 +220,7 @@ namespace util
                   typename Traits = function_traits<FuncType>,
                   typename ReturnType = typename Traits::result_type>
         std::enable_if_t<Traits::arity != 1, ReturnType>
-        do_call(FuncType func,
-                VecType &args,
-                indices<I...>)
+        do_call(FuncType func, VecType &args, indices<I...>)
         {
             assert(args.size() >= Traits::arity);
             return func(*args[I]...); //! function call
@@ -230,10 +268,7 @@ namespace util
                   typename ReturnType = typename Traits::result_type,
                   typename FirstArg = Traits::arg<0>>
         std::enable_if_t<Traits::arity == 1, ReturnType>
-        do_call(ClassType *obj,
-                FuncType func,
-                VecType &args,
-                indices<I...>)
+        do_call(ClassType *obj, FuncType func, VecType &args, indices<I...>)
         {
             using FirstArgType = typename FirstArg::type; //> select first argument type
             assert(args.size() >= Traits::arity);
@@ -247,10 +282,8 @@ namespace util
                   size_t... I,
                   typename Traits = function_traits<FuncType>,
                   typename ReturnType = typename Traits::result_type>
-        std::enable_if_t<Traits::arity != 1, ReturnType> do_call(ClassType *obj,
-                                                                 FuncType func,
-                                                                 VecType &args,
-                                                                 indices<I...>)
+        std::enable_if_t<Traits::arity != 1, ReturnType>
+        do_call(ClassType *obj, FuncType func, VecType &args, indices<I...>)
         {
             assert(args.size() >= Traits::arity);
             return (obj->*func)(*args[I]...); //! member call
@@ -262,8 +295,7 @@ namespace util
               typename VecType,
               typename Traits = function_traits<FuncType>,
               typename ReturnType = typename Traits::result_type>
-    ReturnType unpack_caller(FuncType func,
-                             VecType &args)
+    ReturnType unpack_caller(FuncType func, VecType &args)
     {
         return details::do_call(func, args, BuildIndices<Traits::arity>());
     }
@@ -274,10 +306,7 @@ namespace util
               typename VecType,
               typename Traits = function_traits<FuncType>,
               typename ReturnType = typename Traits::result_type>
-    ReturnType unpack_caller(
-        ClassType *obj,
-        FuncType func,
-        VecType &args)
+    ReturnType unpack_caller(ClassType *obj, FuncType func, VecType &args)
     {
         return details::do_call(obj, func, args, BuildIndices<Traits::arity>());
     }

@@ -111,17 +111,19 @@ namespace script
             // how to process wrapped args that need to be passed on input.
             // In reality the input wrapped args are already customized to hold V8 specific
             // values and these will get passed into the native function upon calling.
-            return new self_type(new util::BindInfoMethod<UserClass, bool, const util::WrappedArgs &>("callback", methodMember, {}), pObject);
+            return new self_type(new util::BindInfoMethod<ScriptMethod>("callback", methodMember, {}), pObject);
         }
 
-        static self_type *create(ScriptMethod methodMember, v8::Isolate *isolate, const LocalFunction &function, UserClass *pObject = nullptr)
+        static self_type *create(ScriptMethod methodMember, v8::Isolate *isolate,
+                                 const LocalFunction &function, UserClass *pObject = nullptr)
         {
             auto callback = self_type::create(methodMember, pObject);
             callback->setNativeFunction(isolate, function);
             return callback;
         }
 
-        static self_type *create(ScriptMethod methodMember, v8::Isolate *isolate, const LocalString &script, UserClass *pObject = nullptr)
+        static self_type *create(ScriptMethod methodMember, v8::Isolate *isolate,
+                                 const LocalString &script, UserClass *pObject = nullptr)
         {
             auto callback = self_type::create(methodMember, pObject);
             callback->setScriptSource(v8pp::from_v8<std::string>(isolate, script.As<v8::Value>()));
@@ -209,10 +211,11 @@ namespace script
     protected:
         static self_type *create(ScriptMethod methodMember, UserClass *pObject = nullptr)
         {
-            return new self_type(new util::BindInfoMethod<UserClass, bool, const util::WrappedArgs &>("callback-timer", methodMember, {}), pObject);
+            return new self_type(new util::BindInfoMethod<ScriptMethod>("callback-timer", methodMember, {}), pObject);
         }
 
-        static self_type *create(ScriptMethod methodMember, v8::Isolate *isolate, const LocalFunction &function, UserClass *pObject = nullptr)
+        static self_type *create(ScriptMethod methodMember, v8::Isolate *isolate,
+                                 const LocalFunction &function, UserClass *pObject = nullptr)
         {
             auto callback = self_type::create(methodMember, pObject);
             callback->setNativeFunction(isolate, function);
@@ -232,7 +235,8 @@ namespace script
                 if (!function->IsFunction())
                     return false; //! skip
                 std::unique_ptr<LocalValue> argv(script::argsToPointer(isolate, m_v8Arguments));
-                auto result = function->Call(context, context->Global(), static_cast<int>(m_v8Arguments.size()), argv.get());
+                auto result = function->Call(context, context->Global(),
+                                             static_cast<int>(m_v8Arguments.size()), argv.get());
             }
             return true;
         } //> evaluate(...)

@@ -49,8 +49,8 @@ namespace util
         FunctionCallback() : Callback(CALLBACK_FUNCTION) {}
         FunctionCallback(BindInfo *pBinding) : Callback(CALLBACK_FUNCTION, pBinding) {}
 
-        template <typename ReturnType, typename... Args>
-        self_type &setup(ReturnType (*function)(Args...),
+        template <typename FunctionType>
+        self_type &setup(FunctionType function,
                          const std::initializer_list<std::string> &argNames = {})
         {
             if (m_binding)
@@ -58,12 +58,14 @@ namespace util
                 auto binding = m_binding.release();
                 delete binding;
             }
-            m_binding.reset(new BindInfoFunction<ReturnType, Args...>("callback", function, argNames));
+            m_binding.reset(new BindInfoFunction<FunctionType>("callback", function, argNames));
             return *this;
         }
 
-        template <typename ReturnType, typename... Args>
-        self_type &setup(std::function<ReturnType(Args...)> &function,
+        template <typename FunctionType,
+                  typename Traits = util::function_traits<FunctionType>,
+                  typename StdFunction = typename Traits::std_function>
+        self_type &setup(StdFunction &function,
                          const std::initializer_list<std::string> &argNames = {})
         {
             if (m_binding)
@@ -71,7 +73,7 @@ namespace util
                 auto binding = m_binding.release();
                 delete binding;
             }
-            m_binding.reset(new BindInfoFunction<ReturnType, Args...>("callback", std::move(function), argNames));
+            m_binding.reset(new BindInfoFunction<FunctionType>("callback", std::move(function), argNames));
             return *this;
         }
 
@@ -89,19 +91,21 @@ namespace util
             return !!BindingHelper::callWrapped((void *)nullptr, m_binding.get(), args);
         }
 
-        template <typename ReturnType, typename... Args>
-        static self_type *create(ReturnType (*function)(Args...),
+        template <typename FunctionType>
+        static self_type *create(FunctionType function,
                                  const std::initializer_list<std::string> &argNames = {})
         {
-            return new self_type(new BindInfoFunction<ReturnType, Args...>("callback", function, argNames));
+            return new self_type(new BindInfoFunction<FunctionType>("callback", function, argNames));
         }
 
-        template <typename ReturnType, typename... Args>
-        static self_type *create(std::function<ReturnType(Args...)> &function,
-                                 const std::initializer_list<std::string> &argNames = {})
-        {
-            return new self_type(new BindInfoFunction<ReturnType, Args...>("callback", std::move(function), argNames));
-        }
+        // template <typename FunctionType,
+        //           typename Traits = util::function_traits<FunctionType>,
+        //           typename StdFunction = typename Traits::std_function>
+        // static self_type *create(StdFunction &function,
+        //                          const std::initializer_list<std::string> &argNames = {})
+        //{
+        //     return new self_type(new BindInfoFunction<FunctionType>("callback", std::move(function), argNames));
+        // }
     }; //# class FunctionCallback
     //#-----------------------------------------------------------------------------------
 
@@ -127,8 +131,8 @@ namespace util
 
         void setObject(UserClass *pObject) { m_pObject = pObject; }
 
-        template <typename UserClass, typename ReturnType, typename... Args>
-        self_type &method(ReturnType (UserClass::*methodMember)(Args...),
+        template <typename MethodType>
+        self_type &method(MethodType methodMember,
                           const std::initializer_list<std::string> &argNames = {})
         {
             if (m_binding)
@@ -136,7 +140,7 @@ namespace util
                 auto binding = m_binding.release();
                 delete binding;
             }
-            m_binding.reset(new BindInfoMethod<UserClass, ReturnType, Args...>("callback", methodMember, argNames));
+            m_binding.reset(new BindInfoMethod<MethodType>("callback", methodMember, argNames));
             return *this;
         }
 
@@ -154,12 +158,14 @@ namespace util
             return !!BindingHelper::callWrapped(m_pObject, m_binding.get(), args);
         }
 
-        template <typename ReturnType, typename... Args>
-        static self_type *create(ReturnType (UserClass::*methodMember)(Args...),
+        template <typename MethodType,
+                  typename Traits = util::function_traits<MethodType>,
+                  typename UserClass = typename Traits::class_type>
+        static self_type *create(MethodType methodMember,
                                  UserClass *pObject = nullptr,
                                  const std::initializer_list<std::string> &argNames = {})
         {
-            return new self_type(new BindInfoMethod<UserClass, ReturnType, Args...>("callback", methodMember, argNames), pObject);
+            return new self_type(new BindInfoMethod<MethodType>("callback", methodMember, argNames), pObject);
         }
     }; //# class MethodCallback
     //#-----------------------------------------------------------------------------------

@@ -96,7 +96,7 @@ bool event::EventManager::initialize(void)
 {
     m_eventStructs.reserve(INITIAL_PTR_VEC_SIZE);
     m_init.store(true);
-    m_cleanupIntervalId = addInterval<EventManager, size_t>(60 * 1000, this, &EventManager::removeInactiveTimers);
+    m_cleanupIntervalId = addInterval(60 * 1000, this, &EventManager::removeInactiveTimers);
     return true;
 }
 //>---------------------------------------------------------------------------------------
@@ -127,7 +127,7 @@ event::ThrownEvent &event::EventManager::throwEvent(Type eventCode, WrappedArgs 
 }
 //>---------------------------------------------------------------------------------------
 
-bool event::EventManager::isRegistered(Type eventCode, util::Callback *pCallback)
+bool event::EventManager::isRegisteredCallback(Type eventCode, util::Callback *pCallback)
 {
     if (eventCode == event::Type::Invalid || !pCallback)
         return false;
@@ -139,7 +139,7 @@ bool event::EventManager::isRegistered(Type eventCode, util::Callback *pCallback
 } //> isRegistered(...)
 //>---------------------------------------------------------------------------------------
 
-event::Type event::EventManager::isRegistered(util::Callback *pCallback)
+event::Type event::EventManager::isRegisteredCallback(util::Callback *pCallback)
 {
     if (!pCallback)
         return event::Type::Invalid;
@@ -241,12 +241,12 @@ unsigned int event::EventManager::executeEvent(Type eventCode, WrappedArgs &args
 } //> executeEvent(...)
 //>---------------------------------------------------------------------------------------
 
-util::Callback *event::EventManager::addCallback(Type eventCode, util::Callback *pCallback)
+util::Callback *event::EventManager::addCallback(util::Callback *pCallback, Type eventCode)
 {
     if (!pCallback || (int)eventCode < 0)
         return nullptr;
     // Duplicate callbacks are not allowed for the same event (avoid double trigger)
-    if (isRegistered(eventCode, pCallback)) //! Lock - event binds
+    if (isRegisteredCallback(eventCode, pCallback)) //! Lock - event binds
         return nullptr;
     {
         const std::lock_guard<std::mutex> lock(m_mutexEventBinds);
@@ -475,7 +475,7 @@ bool event::EventManager::removeTimer(const util::Callback *pCallback)
 } //> removeTimer(...)
 //>---------------------------------------------------------------------------------------
 
-uint32_t event::EventManager::addInterval(const int interval, util::Callback *pCallback,
+uint32_t event::EventManager::addInterval(util::Callback *pCallback, const int interval,
                                           const int repeats, WrappedArgs &args)
 {
     if (!pCallback)
