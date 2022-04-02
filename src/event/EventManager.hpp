@@ -74,10 +74,10 @@ namespace event
         template <typename MethodType,
                   typename Traits = util::function_traits<MethodType>,
                   typename UserClass = Traits::class_type,
-                  bool is_function = std::is_function_v<MethodType>,
+                  bool is_function = std::is_function_v<std::remove_pointer_t<MethodType>>,
                   bool is_member = std::is_member_function_pointer_v<MethodType>,
                   bool is_void = std::is_void_v<UserClass>>
-        typename std::enable_if<is_function == true && is_member == true && is_void == false, util::Callback *>::type
+        typename std::enable_if<is_function == false && is_member == true && is_void == false, util::Callback *>::type
         isRegistered(Type eventCode, MethodType methodMember, UserClass *pObject)
         {
             if (eventCode == Type::Invalid || !methodMember)
@@ -103,7 +103,7 @@ namespace event
         template <typename FunctionType,
                   typename Traits = util::function_traits<FunctionType>,
                   typename UserClass = Traits::class_type,
-                  bool is_function = std::is_function_v<FunctionType>,
+                  bool is_function = std::is_function_v<std::remove_pointer_t<FunctionType>>,
                   bool is_member = std::is_member_function_pointer_v<FunctionType>,
                   bool is_void = std::is_void_v<UserClass>>
         typename std::enable_if<is_function == true && is_member == false && is_void == true, util::Callback *>::type
@@ -129,7 +129,7 @@ namespace event
         template <typename UserClass,
                   typename Traits = util::function_traits<UserClass>,
                   typename UserClassNested = Traits::class_type,
-                  bool is_function = std::is_function_v<UserClass>,
+                  bool is_function = std::is_function_v<std::remove_pointer_t<UserClass>>,
                   bool is_member = std::is_member_function_pointer_v<UserClass>,
                   bool is_void = std::is_void_v<UserClass>>
         typename std::enable_if<is_function == false && is_member == false && is_void == false, util::Callback *>::type
@@ -155,10 +155,10 @@ namespace event
         template <typename MethodType,
                   typename Traits = util::function_traits<MethodType>,
                   typename UserClass = Traits::class_type,
-                  bool is_function = std::is_function_v<MethodType>,
+                  bool is_function = std::is_function_v<std::remove_pointer_t<MethodType>>,
                   bool is_member = std::is_member_function_pointer_v<MethodType>,
                   bool is_void = std::is_void_v<UserClass>>
-        typename std::enable_if<is_function == true && is_member == true && is_void == false, Type>::type
+        typename std::enable_if<is_function == false && is_member == true && is_void == false, Type>::type
         isRegistered(MethodType methodMember, UserClass *pObject)
         {
             if (!methodMember)
@@ -188,7 +188,7 @@ namespace event
         template <typename FunctionType,
                   typename Traits = util::function_traits<FunctionType>,
                   typename UserClass = Traits::class_type,
-                  bool is_function = std::is_function_v<FunctionType>,
+                  bool is_function = std::is_function_v<std::remove_pointer_t<FunctionType>>,
                   bool is_member = std::is_member_function_pointer_v<FunctionType>,
                   bool is_void = std::is_void_v<UserClass>>
         typename std::enable_if<is_function == true && is_member == false && is_void == true, Type>::type
@@ -218,7 +218,7 @@ namespace event
         template <typename UserClass,
                   typename Traits = util::function_traits<UserClass>,
                   typename UserClassNested = Traits::class_type,
-                  bool is_function = std::is_function_v<UserClass>,
+                  bool is_function = std::is_function_v<std::remove_pointer_t<UserClass>>,
                   bool is_member = std::is_member_function_pointer_v<UserClass>,
                   bool is_void = std::is_void_v<UserClass>>
         typename std::enable_if<is_function == false && is_member == false && is_void == false, Type>::type

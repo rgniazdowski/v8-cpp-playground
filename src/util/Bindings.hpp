@@ -768,8 +768,8 @@ namespace util
 
         virtual ~BindInfoFunction() {}
 
-        bool compare(FunctionType function) { return address == (size_t)function; }
-        bool compare(const DirectFunction &function)
+        bool compare(FunctionType function) const { return address == (size_t)function; }
+        bool compare(const DirectFunction &function) const
         {
             auto *fnPointer = function.template target<FunctionType>();
             size_t cmpaddr = (size_t)(fnPointer != nullptr ? *fnPointer : 0);
@@ -860,7 +860,7 @@ namespace util
 
         virtual ~BindInfoMethod() {}
 
-        bool compare(MethodType methodMember) { return direct == methodMember; }
+        bool compare(MethodType methodMember) const { return direct == methodMember; }
 
         template <typename... Args>
         ReturnType call(UserClass *pObject, Args &&...args) const
@@ -932,6 +932,8 @@ namespace util
         }
 
         virtual ~BindInfoMethod() {}
+
+        bool compare(MethodType methodMember) const { return direct == methodMember; }
 
         template <typename... Args>
         ReturnType call(void *pObject, Args &&...args) const
@@ -1322,13 +1324,26 @@ namespace util
         BindingHelper(const BindingHelper &other) = delete;
         //>-------------------------------------------------------------------------------
 
-        template <typename FunctionOrMethodType>
-        static bool compare(const BindInfo *pBinding, FunctionOrMethodType functionOrMethod)
+        template <typename FunctionType,
+                  bool is_function = std::is_function_v<std::remove_pointer_t<FunctionType>>,
+                  bool is_member = std::is_member_function_pointer_v<FunctionType>>
+        static typename std::enable_if<is_function == true && is_member == false, bool>::type
+        compare(const BindInfo *pBinding, FunctionType function)
+        {
+            if (pBinding->isFunction())
+                static_cast<const BindInfoFunction<FunctionType> *>(pBinding)->compare(function);
+            return false;
+        }
+        //>-------------------------------------------------------------------------------
+
+        template <typename MethodType,
+                  bool is_function = std::is_function_v<std::remove_pointer_t<MethodType>>,
+                  bool is_member = std::is_member_function_pointer_v<MethodType>>
+        static typename std::enable_if<is_function == false && is_member == true, bool>::type
+        compare(const BindInfo *pBinding, MethodType method)
         {
             if (pBinding->isMethod())
-                return static_cast<const BindInfoMethod<FunctionOrMethodType> *>(pBinding)->compare(functionOrMethod);
-            if (pBinding->isFunction())
-                return static_cast<const BindInfoFunction<FunctionOrMethodType> *>(pBinding)->compare(functionOrMethod);
+                static_cast<const BindInfoMethod<MethodType> *>(pBinding)->compare(method);
             return false;
         }
         //>-------------------------------------------------------------------------------
